@@ -42,7 +42,7 @@ namespace ExtremeInjector.UI
         private void InitializeComponent(string dllPath, string? export, string? parameters)
         {
             Text = "Advanced Module Options";
-            ClientSize = new Size(244, 275);
+            ClientSize = new Size(269, 275);
             StartPosition = FormStartPosition.CenterParent;
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;

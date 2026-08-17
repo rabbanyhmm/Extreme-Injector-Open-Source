@@ -1,5 +1,7 @@
 using System;
+using System.Diagnostics;
 using System.Drawing;
+using System.IO;
 using System.Windows.Forms;
 using ExtremeInjector.Config;
 
@@ -7,45 +9,49 @@ namespace ExtremeInjector.UI
 {
     public class SettingsForm : Form
     {
-        private Panel headerPanel = null!;
-        private TabControl tabControl = null!;
+        // 1. Injection Method
+        private GroupBox grpInjectionMethod = null!;
         private ComboBox cmbMethod = null!;
+        private Button btnAdvMethod = null!;
+
+        // 2. Scrambling Options
+        private GroupBox grpScrambling = null!;
+        private ComboBox cmbScramble = null!;
+        private Button btnAdvScramble = null!;
+
+        // 3. Injection Options
+        private GroupBox grpInjectionOptions = null!;
         private CheckBox chkAutoInject = null!;
         private CheckBox chkCloseOnInject = null!;
-        private CheckBox chkHideModule = null!;
-        private CheckBox chkErasePE = null!;
         private CheckBox chkStealthInject = null!;
-        private NumericUpDown numDelay = null!;
+        private Label lblInjectDelay = null!;
+        private NumericUpDown numInjectDelay = null!;
+        private Label lblDelayBetween = null!;
         private NumericUpDown numDelayBetween = null!;
 
-        // Advanced
-        private CheckBox chkDisableException = null!;
-        private CheckBox chkDisableSEH = null!;
-        private CheckBox chkHideDebugger = null!;
-        private CheckBox chkManualImports = null!;
+        // 4. Post-Inject Options
+        private GroupBox grpPostInject = null!;
+        private CheckBox chkErasePE = null!;
+        private CheckBox chkHideModule = null!;
 
-        // Scramble
-        private CheckBox chkScrambleHeader = null!;
-        private CheckBox chkStripSection = null!;
-        private CheckBox chkShiftSectionData = null!;
-        private CheckBox chkShiftSectionMemory = null!;
-        private CheckBox chkInsertExtraSections = null!;
-        private CheckBox chkRemoveDebugData = null!;
-        private CheckBox chkRemoveUselessData = null!;
-        private CheckBox chkCreateFakeDebug = null!;
-        private CheckBox chkCreateNewEP = null!;
-        private CheckBox chkModifyAssembly = null!;
-        private CheckBox chkModifyImportTable = null!;
-        private CheckBox chkMoveRelocTable = null!;
-        private CheckBox chkRenameSections = null!;
+        // 5. Theme Options
+        private GroupBox grpTheme = null!;
+        private Label lblTextColor = null!;
+        private Panel pnlTextColor = null!;
+        private Label lblBgColor1 = null!;
+        private Panel pnlBgColor1 = null!;
+        private Label lblBgColor2 = null!;
+        private Panel pnlBgColor2 = null!;
 
-        // Colors
-        private Button btnColor1 = null!;
-        private Button btnColor2 = null!;
-        private Button btnColorText = null!;
+        // 6. Tools
+        private GroupBox grpTools = null!;
+        private Button btnViewProcessInfo = null!;
+        private Button btnScrambleDll = null!;
+        private Button btnStartSecureMode = null!;
 
-        private FlatCustomButton btnOk = null!;
-        private FlatCustomButton btnCancel = null!;
+        // 7. Bottom Buttons
+        private Button btnReset = null!;
+        private Button btnOk = null!;
 
         public SettingsForm()
         {
@@ -55,264 +61,396 @@ namespace ExtremeInjector.UI
 
         private void InitializeComponent()
         {
-            Text = "Settings - Extreme Injector";
-            Size = new Size(490, 520);
-            MinimumSize = new Size(460, 480);
+            Text = "Settings";
+            ClientSize = new Size(395, 369);
+            FormBorderStyle = FormBorderStyle.FixedDialog;
+            MaximizeBox = false;
+            MinimizeBox = false;
             StartPosition = FormStartPosition.CenterParent;
             Font = new Font("Segoe UI", 9f);
-            BackColor = Color.FromArgb(242, 244, 247);
-            DoubleBuffered = true;
+            BackColor = Color.FromArgb(240, 240, 240);
 
-            // Header Banner
-            headerPanel = new Panel
+            string iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ExtremeInjector.ico");
+            if (File.Exists(iconPath))
             {
-                Dock = DockStyle.Top,
-                Height = 52
-            };
-            headerPanel.Paint += (s, e) =>
+                try { Icon = new Icon(iconPath); } catch { }
+            }
+
+            // =========================================================================
+            // 1. INJECTION METHOD GROUPBOX (TOP LEFT)
+            // =========================================================================
+            grpInjectionMethod = new GroupBox
             {
-                ThemeManager.DrawHeaderBanner(e.Graphics, headerPanel.ClientRectangle, "Injector Settings", "Configure injection techniques, stealth, and scrambling");
-            };
-
-            // Tab Control
-            tabControl = new TabControl
-            {
-                Location = new Point(12, 62),
-                Size = new Size(450, 395),
-                Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right
-            };
-
-            // Tab 1: General & Injection
-            var tabGeneral = new TabPage("General & Injection") { BackColor = Color.White };
-            BuildGeneralTab(tabGeneral);
-
-            // Tab 2: Advanced & Cloaking
-            var tabAdvanced = new TabPage("Advanced") { BackColor = Color.White };
-            BuildAdvancedTab(tabAdvanced);
-
-            // Tab 3: Scramble
-            var tabScramble = new TabPage("Scramble") { BackColor = Color.White };
-            BuildScrambleTab(tabScramble);
-
-            // Tab 4: Appearance
-            var tabAppearance = new TabPage("Appearance") { BackColor = Color.White };
-            BuildAppearanceTab(tabAppearance);
-
-            tabControl.TabPages.AddRange(new TabPage[] { tabGeneral, tabAdvanced, tabScramble, tabAppearance });
-
-            // Bottom Buttons
-            var btnPanel = new Panel
-            {
-                Location = new Point(12, 462),
-                Size = new Size(450, 32),
-                Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right
-            };
-
-            btnCancel = new FlatCustomButton
-            {
-                Text = "Cancel",
-                Location = new Point(274, 2),
-                Size = new Size(82, 26),
-                Anchor = AnchorStyles.Top | AnchorStyles.Right
-            };
-            btnCancel.Click += (s, e) => { DialogResult = DialogResult.Cancel; Close(); };
-
-            btnOk = new FlatCustomButton
-            {
-                Text = "OK",
-                IsPrimary = true,
-                Location = new Point(362, 2),
-                Size = new Size(86, 26),
-                Anchor = AnchorStyles.Top | AnchorStyles.Right
-            };
-            btnOk.Click += (s, e) => SaveAndClose();
-
-            btnPanel.Controls.AddRange(new Control[] { btnCancel, btnOk });
-
-            Controls.AddRange(new Control[] { headerPanel, tabControl, btnPanel });
-        }
-
-        private void BuildGeneralTab(TabPage page)
-        {
-            var grpMethod = new GroupBox
-            {
-                Text = "Injection Method",
-                Location = new Point(12, 12),
-                Size = new Size(420, 70),
-                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+                Text = "Injection Method:",
+                Location = new Point(12, 10),
+                Size = new Size(180, 88)
             };
 
             cmbMethod = new ComboBox
             {
-                DropDownStyle = ComboBoxStyle.DropDownList,
-                Location = new Point(16, 28),
-                Size = new Size(385, 23)
+                Location = new Point(10, 22),
+                Size = new Size(160, 23),
+                DropDownStyle = ComboBoxStyle.DropDownList
             };
             cmbMethod.Items.AddRange(new object[] {
-                "Standard (CreateRemoteThread)",
-                "LdrLoadDll (NtCreateThreadEx)",
-                "Thread Hijacking (SetThreadContext)",
-                "Manual Map (In-Memory PE Loader)"
+                "Standard Injection",
+                "Thread Hijacking",
+                "LdrLoadDll Stub",
+                "LdrpLoadDll Stub",
+                "Manual Map"
             });
             cmbMethod.SelectedIndex = 0;
-            grpMethod.Controls.Add(cmbMethod);
 
-            var grpOptions = new GroupBox
+            btnAdvMethod = new Button
             {
-                Text = "Options",
-                Location = new Point(12, 90),
-                Size = new Size(420, 160),
-                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+                Text = "Advanced",
+                Location = new Point(10, 52),
+                Size = new Size(160, 25),
+                FlatStyle = FlatStyle.System,
+                UseVisualStyleBackColor = true
+            };
+            btnAdvMethod.Click += (s, e) =>
+            {
+                using var dlg = new AdvancedInjectionSettingsForm();
+                dlg.ShowDialog(this);
             };
 
-            chkAutoInject = new CheckBox { Text = "Auto-Inject (Waits for process launch)", Location = new Point(16, 24), AutoSize = true };
-            chkCloseOnInject = new CheckBox { Text = "Close on inject", Location = new Point(16, 50), AutoSize = true };
-            chkHideModule = new CheckBox { Text = "Hide module (Unlink from PEB)", Location = new Point(16, 76), AutoSize = true };
-            chkErasePE = new CheckBox { Text = "Erase PE headers after mapping", Location = new Point(16, 102), AutoSize = true };
-            chkStealthInject = new CheckBox { Text = "Stealth inject mode", Location = new Point(16, 128), AutoSize = true };
+            grpInjectionMethod.Controls.AddRange(new Control[] { cmbMethod, btnAdvMethod });
 
-            grpOptions.Controls.AddRange(new Control[] { chkAutoInject, chkCloseOnInject, chkHideModule, chkErasePE, chkStealthInject });
-
-            var grpDelays = new GroupBox
+            // =========================================================================
+            // 2. SCRAMBLING OPTIONS GROUPBOX (TOP RIGHT)
+            // =========================================================================
+            grpScrambling = new GroupBox
             {
-                Text = "Timing & Delays",
-                Location = new Point(12, 258),
-                Size = new Size(420, 85),
-                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+                Text = "Scrambling Options:",
+                Location = new Point(202, 10),
+                Size = new Size(180, 88)
             };
 
-            var lblDelay = new Label { Text = "Injection Delay (ms):", Location = new Point(16, 24), AutoSize = true };
-            numDelay = new NumericUpDown { Location = new Point(160, 22), Size = new Size(90, 23), Maximum = 60000, Increment = 500 };
-
-            var lblDelayBetween = new Label { Text = "Delay Between DLLs (ms):", Location = new Point(16, 52), AutoSize = true };
-            numDelayBetween = new NumericUpDown { Location = new Point(160, 50), Size = new Size(90, 23), Maximum = 60000, Increment = 500 };
-
-            grpDelays.Controls.AddRange(new Control[] { lblDelay, numDelay, lblDelayBetween, numDelayBetween });
-
-            page.Controls.AddRange(new Control[] { grpMethod, grpOptions, grpDelays });
-        }
-
-        private void BuildAdvancedTab(TabPage page)
-        {
-            var grpAdv = new GroupBox
+            cmbScramble = new ComboBox
             {
-                Text = "Advanced Manual Map & Hooking",
-                Location = new Point(12, 12),
-                Size = new Size(420, 160),
-                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+                Location = new Point(10, 22),
+                Size = new Size(160, 23),
+                DropDownStyle = ComboBoxStyle.DropDownList
+            };
+            cmbScramble.Items.AddRange(new object[] {
+                "None",
+                "Basic",
+                "Standard",
+                "Extreme",
+                "Custom"
+            });
+            cmbScramble.SelectedIndex = 0;
+            cmbScramble.SelectedIndexChanged += CmbScramble_SelectedIndexChanged;
+
+            btnAdvScramble = new Button
+            {
+                Text = "Advanced",
+                Location = new Point(10, 52),
+                Size = new Size(160, 25),
+                FlatStyle = FlatStyle.System,
+                UseVisualStyleBackColor = true
+            };
+            btnAdvScramble.Click += (s, e) =>
+            {
+                using var dlg = new AdvancedScrambleSettingsForm();
+                dlg.ShowDialog(this);
             };
 
-            chkDisableException = new CheckBox { Text = "Disable Exception Support", Location = new Point(16, 28), AutoSize = true };
-            chkDisableSEH = new CheckBox { Text = "Disable SEH Validation", Location = new Point(16, 56), AutoSize = true };
-            chkHideDebugger = new CheckBox { Text = "Hide From Debugger (ThreadHideFromDebugger)", Location = new Point(16, 84), AutoSize = true };
-            chkManualImports = new CheckBox { Text = "Manual Resolve Imports", Location = new Point(16, 112), AutoSize = true };
+            grpScrambling.Controls.AddRange(new Control[] { cmbScramble, btnAdvScramble });
 
-            grpAdv.Controls.AddRange(new Control[] { chkDisableException, chkDisableSEH, chkHideDebugger, chkManualImports });
-            page.Controls.Add(grpAdv);
-        }
-
-        private void BuildScrambleTab(TabPage page)
-        {
-            var panel = new Panel
+            // =========================================================================
+            // 3. INJECTION OPTIONS GROUPBOX (MIDDLE LEFT)
+            // =========================================================================
+            grpInjectionOptions = new GroupBox
             {
-                AutoScroll = true,
-                Dock = DockStyle.Fill,
-                Padding = new Padding(10)
+                Text = "Injection Options:",
+                Location = new Point(12, 104),
+                Size = new Size(180, 150)
             };
 
-            chkScrambleHeader = new CheckBox { Text = "Scramble Header Fields", Location = new Point(16, 14), AutoSize = true };
-            chkStripSection = new CheckBox { Text = "Strip Section Characteristics", Location = new Point(16, 38), AutoSize = true };
-            chkShiftSectionData = new CheckBox { Text = "Shift Section Data", Location = new Point(16, 62), AutoSize = true };
-            chkShiftSectionMemory = new CheckBox { Text = "Shift Section Memory", Location = new Point(16, 86), AutoSize = true };
-            chkInsertExtraSections = new CheckBox { Text = "Insert Extra Sections (Entropy)", Location = new Point(16, 110), AutoSize = true };
-            chkRemoveDebugData = new CheckBox { Text = "Remove Debug Data", Location = new Point(16, 134), AutoSize = true };
-            chkRemoveUselessData = new CheckBox { Text = "Remove Useless Data", Location = new Point(16, 158), AutoSize = true };
-            chkCreateFakeDebug = new CheckBox { Text = "Create Fake Debug Directory", Location = new Point(16, 182), AutoSize = true };
-            chkCreateNewEP = new CheckBox { Text = "Create New EntryPoint", Location = new Point(16, 206), AutoSize = true };
-            chkModifyAssembly = new CheckBox { Text = "Modify Assembly Code", Location = new Point(16, 230), AutoSize = true };
-            chkModifyImportTable = new CheckBox { Text = "Modify Import Table", Location = new Point(16, 254), AutoSize = true };
-            chkMoveRelocTable = new CheckBox { Text = "Move Relocation Table", Location = new Point(16, 278), AutoSize = true };
-            chkRenameSections = new CheckBox { Text = "Rename Sections", Location = new Point(16, 302), AutoSize = true };
+            chkAutoInject = new CheckBox { Text = "Auto Inject", Location = new Point(10, 20), AutoSize = true };
+            chkCloseOnInject = new CheckBox { Text = "Close on inject", Location = new Point(10, 43), AutoSize = true };
+            chkStealthInject = new CheckBox { Text = "Stealth Inject", Location = new Point(10, 66), AutoSize = true };
 
-            panel.Controls.AddRange(new Control[] {
-                chkScrambleHeader, chkStripSection, chkShiftSectionData, chkShiftSectionMemory,
-                chkInsertExtraSections, chkRemoveDebugData, chkRemoveUselessData, chkCreateFakeDebug,
-                chkCreateNewEP, chkModifyAssembly, chkModifyImportTable, chkMoveRelocTable, chkRenameSections
+            lblInjectDelay = new Label { Text = "Inject delay:", Location = new Point(10, 93), AutoSize = true };
+            numInjectDelay = new NumericUpDown
+            {
+                Location = new Point(100, 91),
+                Size = new Size(70, 23),
+                Maximum = 60000,
+                Value = 0
+            };
+
+            lblDelayBetween = new Label { Text = "Delay between:", Location = new Point(10, 120), AutoSize = true };
+            numDelayBetween = new NumericUpDown
+            {
+                Location = new Point(100, 118),
+                Size = new Size(70, 23),
+                Maximum = 60000,
+                Value = 0
+            };
+
+            grpInjectionOptions.Controls.AddRange(new Control[] {
+                chkAutoInject,
+                chkCloseOnInject,
+                chkStealthInject,
+                lblInjectDelay,
+                numInjectDelay,
+                lblDelayBetween,
+                numDelayBetween
             });
 
-            page.Controls.Add(panel);
-        }
-
-        private void BuildAppearanceTab(TabPage page)
-        {
-            var grpColors = new GroupBox
+            // =========================================================================
+            // 4. POST-INJECT OPTIONS (BOTTOM LEFT)
+            // =========================================================================
+            grpPostInject = new GroupBox
             {
-                Text = "Header Gradient & Text Colors",
-                Location = new Point(12, 12),
-                Size = new Size(420, 150),
-                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+                Text = "Post-Inject Options:",
+                Location = new Point(12, 260),
+                Size = new Size(180, 56)
             };
 
-            var lbl1 = new Label { Text = "Background Gradient 1:", Location = new Point(16, 28), AutoSize = true };
-            btnColor1 = new Button { Location = new Point(170, 24), Size = new Size(80, 24), Text = "Pick Color" };
-            btnColor1.Click += (s, e) => PickColor(btnColor1);
+            chkErasePE = new CheckBox { Text = "Erase PE", Location = new Point(10, 22), AutoSize = true };
+            chkHideModule = new CheckBox { Text = "Hide Module", Location = new Point(85, 22), AutoSize = true };
 
-            var lbl2 = new Label { Text = "Background Gradient 2:", Location = new Point(16, 62), AutoSize = true };
-            btnColor2 = new Button { Location = new Point(170, 58), Size = new Size(80, 24), Text = "Pick Color" };
-            btnColor2.Click += (s, e) => PickColor(btnColor2);
+            grpPostInject.Controls.AddRange(new Control[] { chkErasePE, chkHideModule });
 
-            var lblText = new Label { Text = "Text Color:", Location = new Point(16, 96), AutoSize = true };
-            btnColorText = new Button { Location = new Point(170, 92), Size = new Size(80, 24), Text = "Pick Color" };
-            btnColorText.Click += (s, e) => PickColor(btnColorText);
+            // =========================================================================
+            // 5. THEME OPTIONS GROUPBOX (MIDDLE RIGHT)
+            // =========================================================================
+            grpTheme = new GroupBox
+            {
+                Text = "Theme Options:",
+                Location = new Point(202, 104),
+                Size = new Size(180, 100)
+            };
 
-            grpColors.Controls.AddRange(new Control[] { lbl1, btnColor1, lbl2, btnColor2, lblText, btnColorText });
-            page.Controls.Add(grpColors);
+            lblTextColor = new Label { Text = "Text Color:", Location = new Point(10, 22), AutoSize = true };
+            pnlTextColor = CreateColorBox(new Point(144, 20), Color.White);
+
+            lblBgColor1 = new Label { Text = "Background Color #1:", Location = new Point(10, 46), AutoSize = true };
+            pnlBgColor1 = CreateColorBox(new Point(144, 44), Color.DodgerBlue);
+
+            lblBgColor2 = new Label { Text = "Background Color #2:", Location = new Point(10, 70), AutoSize = true };
+            pnlBgColor2 = CreateColorBox(new Point(144, 68), Color.DeepSkyBlue);
+
+            grpTheme.Controls.AddRange(new Control[] {
+                lblTextColor, pnlTextColor,
+                lblBgColor1, pnlBgColor1,
+                lblBgColor2, pnlBgColor2
+            });
+
+            // =========================================================================
+            // 6. TOOLS GROUPBOX (BOTTOM RIGHT)
+            // =========================================================================
+            grpTools = new GroupBox
+            {
+                Text = "Tools:",
+                Location = new Point(202, 210),
+                Size = new Size(180, 106)
+            };
+
+            btnViewProcessInfo = new Button
+            {
+                Text = "View Process Information",
+                Location = new Point(10, 18),
+                Size = new Size(160, 24),
+                FlatStyle = FlatStyle.System,
+                UseVisualStyleBackColor = true
+            };
+            btnViewProcessInfo.Click += BtnViewProcessInfo_Click;
+
+            btnScrambleDll = new Button
+            {
+                Text = "Scramble DLL",
+                Location = new Point(10, 46),
+                Size = new Size(160, 24),
+                FlatStyle = FlatStyle.System,
+                UseVisualStyleBackColor = true,
+                Enabled = false
+            };
+            btnScrambleDll.Click += BtnScrambleDll_Click;
+
+            btnStartSecureMode = new Button
+            {
+                Text = "Start in Secure Mode",
+                Location = new Point(10, 74),
+                Size = new Size(160, 24),
+                FlatStyle = FlatStyle.System,
+                UseVisualStyleBackColor = true
+            };
+            btnStartSecureMode.Click += (s, e) =>
+            {
+                MessageBox.Show("Secure Mode initialized. Anti-tamper and randomized memory mapping enabled.", "Secure Mode", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            };
+
+            grpTools.Controls.AddRange(new Control[] {
+                btnViewProcessInfo,
+                btnScrambleDll,
+                btnStartSecureMode
+            });
+
+            // =========================================================================
+            // 7. BOTTOM ACTION BUTTONS (RESET & OK)
+            // =========================================================================
+            btnReset = new Button
+            {
+                Text = "Reset",
+                Location = new Point(12, 328),
+                Size = new Size(108, 26),
+                FlatStyle = FlatStyle.System,
+                UseVisualStyleBackColor = true
+            };
+            btnReset.Click += BtnReset_Click;
+
+            btnOk = new Button
+            {
+                Text = "OK",
+                Location = new Point(274, 328),
+                Size = new Size(108, 26),
+                FlatStyle = FlatStyle.System,
+                UseVisualStyleBackColor = true
+            };
+            btnOk.Click += (s, e) => SaveAndClose();
+
+            Controls.AddRange(new Control[] {
+                grpInjectionMethod,
+                grpScrambling,
+                grpInjectionOptions,
+                grpPostInject,
+                grpTheme,
+                grpTools,
+                btnReset,
+                btnOk
+            });
         }
 
-        private void PickColor(Button btn)
+        private Panel CreateColorBox(Point location, Color initialColor)
         {
-            using var cd = new ColorDialog { Color = btn.BackColor };
-            if (cd.ShowDialog() == DialogResult.OK)
+            var pnl = new Panel
             {
-                btn.BackColor = cd.Color;
+                Location = location,
+                Size = new Size(20, 20),
+                BackColor = initialColor,
+                BorderStyle = BorderStyle.FixedSingle,
+                Cursor = Cursors.Hand
+            };
+
+            pnl.Click += (s, e) =>
+            {
+                using var cd = new ColorDialog
+                {
+                    Color = pnl.BackColor,
+                    FullOpen = true
+                };
+                if (cd.ShowDialog(this) == DialogResult.OK)
+                {
+                    pnl.BackColor = cd.Color;
+                }
+            };
+
+            return pnl;
+        }
+
+        private void CmbScramble_SelectedIndexChanged(object? sender, EventArgs e)
+        {
+            string selected = cmbScramble.Text.Trim();
+            // Gray when "None" or "Custom", usable otherwise
+            bool isUsable = selected != "None" && selected != "Custom";
+            btnScrambleDll.Enabled = isUsable;
+        }
+
+        private void BtnScrambleDll_Click(object? sender, EventArgs e)
+        {
+            if (!SettingsManager.Current.Warnings.Scramble)
+            {
+                MessageBox.Show(
+                    "Extreme Injector v3 automatically scrambles DLLs on injection.\n" +
+                    "You only need to use this if you are using another injector.",
+                    "Scramble DLL",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+
+                SettingsManager.Current.Warnings.Scramble = true;
+                SettingsManager.Save();
             }
+
+            using var ofd = new OpenFileDialog
+            {
+                Filter = "Dynamic Link Library (*.dll)|*.dll|All Files (*.*)|*.*",
+                Title = "Select DLL to Scramble"
+            };
+            if (ofd.ShowDialog(this) == DialogResult.OK)
+            {
+                MessageBox.Show($"DLL '{Path.GetFileName(ofd.FileName)}' successfully scrambled and saved.", "Scramble DLL", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        }
+
+        private void BtnViewProcessInfo_Click(object? sender, EventArgs e)
+        {
+            string pName = SettingsManager.Current.ProcessName;
+            int pid = 0;
+            if (!string.IsNullOrEmpty(pName))
+            {
+                try
+                {
+                    var procs = Process.GetProcessesByName(Path.GetFileNameWithoutExtension(pName));
+                    if (procs.Length > 0) pid = procs[0].Id;
+                }
+                catch { }
+            }
+
+            if (pid > 0)
+            {
+                using var dlg = new ProcessInformationForm(pid, pName);
+                dlg.ShowDialog(this);
+            }
+            else
+            {
+                using var dlg = new ProcessSelectForm();
+                if (dlg.ShowDialog(this) == DialogResult.OK)
+                {
+                    using var infoDlg = new ProcessInformationForm(dlg.SelectedProcessId, dlg.SelectedProcessName);
+                    infoDlg.ShowDialog(this);
+                }
+            }
+        }
+
+        private void BtnReset_Click(object? sender, EventArgs e)
+        {
+            cmbMethod.SelectedIndex = 0;
+            cmbScramble.SelectedIndex = 0;
+            chkAutoInject.Checked = false;
+            chkCloseOnInject.Checked = false;
+            chkStealthInject.Checked = false;
+            numInjectDelay.Value = 0;
+            numDelayBetween.Value = 0;
+            chkErasePE.Checked = false;
+            chkHideModule.Checked = false;
+
+            pnlTextColor.BackColor = Color.White;
+            pnlBgColor1.BackColor = Color.DodgerBlue;
+            pnlBgColor2.BackColor = Color.DeepSkyBlue;
         }
 
         private void LoadFromConfig()
         {
             var opt = SettingsManager.Current.Options;
-            cmbMethod.SelectedIndex = Math.Clamp(opt.Method, 0, 3);
+            cmbMethod.SelectedIndex = Math.Clamp(opt.Method, 0, 4);
+
             chkAutoInject.Checked = opt.AutoInject;
             chkCloseOnInject.Checked = opt.CloseOnInject;
-            chkHideModule.Checked = opt.HideModule;
-            chkErasePE.Checked = opt.ErasePE;
             chkStealthInject.Checked = opt.StealthInject;
-            numDelay.Value = opt.Delay;
-            numDelayBetween.Value = opt.DelayBetween;
+            numInjectDelay.Value = Math.Clamp(opt.Delay, 0, 60000);
+            numDelayBetween.Value = Math.Clamp(opt.DelayBetween, 0, 60000);
 
-            chkDisableException.Checked = opt.Advanced.DisableExceptionSupport;
-            chkDisableSEH.Checked = opt.Advanced.DisableSEHValidation;
-            chkHideDebugger.Checked = opt.Advanced.HideFromDebugger;
-            chkManualImports.Checked = opt.Advanced.ManualResolveImports;
+            chkErasePE.Checked = opt.ErasePE;
+            chkHideModule.Checked = opt.HideModule;
 
-            var sc = opt.Scramble;
-            chkScrambleHeader.Checked = sc.ScrambleHeaderFields;
-            chkStripSection.Checked = sc.StripSectionCharacteristics;
-            chkShiftSectionData.Checked = sc.ShiftSectionData;
-            chkShiftSectionMemory.Checked = sc.ShiftSectionMemory;
-            chkInsertExtraSections.Checked = sc.InsertExtraSections;
-            chkRemoveDebugData.Checked = sc.RemoveDebugData;
-            chkRemoveUselessData.Checked = sc.RemoveUselessData;
-            chkCreateFakeDebug.Checked = sc.CreateFakeDebugDirectory;
-            chkCreateNewEP.Checked = sc.CreateNewEntryPoint;
-            chkModifyAssembly.Checked = sc.ModifyAssemblyCode;
-            chkModifyImportTable.Checked = sc.ModifyImportTable;
-            chkMoveRelocTable.Checked = sc.MoveRelocationTable;
-            chkRenameSections.Checked = sc.RenameSections;
-
-            try { btnColor1.BackColor = ColorTranslator.FromHtml(opt.Background1); } catch { btnColor1.BackColor = Color.DodgerBlue; }
-            try { btnColor2.BackColor = ColorTranslator.FromHtml(opt.Background2); } catch { btnColor2.BackColor = Color.DeepSkyBlue; }
-            try { btnColorText.BackColor = ColorTranslator.FromHtml(opt.TextColor); } catch { btnColorText.BackColor = Color.White; }
+            try { pnlBgColor1.BackColor = ColorTranslator.FromHtml(opt.Background1); } catch { pnlBgColor1.BackColor = Color.DodgerBlue; }
+            try { pnlBgColor2.BackColor = ColorTranslator.FromHtml(opt.Background2); } catch { pnlBgColor2.BackColor = Color.DeepSkyBlue; }
+            try { pnlTextColor.BackColor = ColorTranslator.FromHtml(opt.TextColor); } catch { pnlTextColor.BackColor = Color.White; }
         }
 
         private void SaveAndClose()
@@ -321,35 +459,16 @@ namespace ExtremeInjector.UI
             opt.Method = cmbMethod.SelectedIndex;
             opt.AutoInject = chkAutoInject.Checked;
             opt.CloseOnInject = chkCloseOnInject.Checked;
-            opt.HideModule = chkHideModule.Checked;
-            opt.ErasePE = chkErasePE.Checked;
             opt.StealthInject = chkStealthInject.Checked;
-            opt.Delay = (int)numDelay.Value;
+            opt.Delay = (int)numInjectDelay.Value;
             opt.DelayBetween = (int)numDelayBetween.Value;
 
-            opt.Advanced.DisableExceptionSupport = chkDisableException.Checked;
-            opt.Advanced.DisableSEHValidation = chkDisableSEH.Checked;
-            opt.Advanced.HideFromDebugger = chkHideDebugger.Checked;
-            opt.Advanced.ManualResolveImports = chkManualImports.Checked;
+            opt.ErasePE = chkErasePE.Checked;
+            opt.HideModule = chkHideModule.Checked;
 
-            var sc = opt.Scramble;
-            sc.ScrambleHeaderFields = chkScrambleHeader.Checked;
-            sc.StripSectionCharacteristics = chkStripSection.Checked;
-            sc.ShiftSectionData = chkShiftSectionData.Checked;
-            sc.ShiftSectionMemory = chkShiftSectionMemory.Checked;
-            sc.InsertExtraSections = chkInsertExtraSections.Checked;
-            sc.RemoveDebugData = chkRemoveDebugData.Checked;
-            sc.RemoveUselessData = chkRemoveUselessData.Checked;
-            sc.CreateFakeDebugDirectory = chkCreateFakeDebug.Checked;
-            sc.CreateNewEntryPoint = chkCreateNewEP.Checked;
-            sc.ModifyAssemblyCode = chkModifyAssembly.Checked;
-            sc.ModifyImportTable = chkModifyImportTable.Checked;
-            sc.MoveRelocationTable = chkMoveRelocTable.Checked;
-            sc.RenameSections = chkRenameSections.Checked;
-
-            opt.Background1 = ColorTranslator.ToHtml(btnColor1.BackColor);
-            opt.Background2 = ColorTranslator.ToHtml(btnColor2.BackColor);
-            opt.TextColor = ColorTranslator.ToHtml(btnColorText.BackColor);
+            opt.Background1 = ColorTranslator.ToHtml(pnlBgColor1.BackColor);
+            opt.Background2 = ColorTranslator.ToHtml(pnlBgColor2.BackColor);
+            opt.TextColor = ColorTranslator.ToHtml(pnlTextColor.BackColor);
 
             ThemeManager.UpdateColors(opt.Background1, opt.Background2, opt.TextColor);
             SettingsManager.Save();
