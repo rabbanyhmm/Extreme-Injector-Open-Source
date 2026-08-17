@@ -439,8 +439,8 @@ namespace ExtremeInjector.UI
                 string baseTitle = originalHeaders[i];
                 if (i == sortCol)
                 {
-                    // Right-side clean arrow aligned next to the title
-                    lv.Columns[i].Text = baseTitle + (sortAsc ? "   ▲" : "   ▼");
+                    // Space out arrow towards the right side of the column header
+                    lv.Columns[i].Text = $"{baseTitle}               {(sortAsc ? "▲" : "▼")}";
                 }
                 else
                 {
