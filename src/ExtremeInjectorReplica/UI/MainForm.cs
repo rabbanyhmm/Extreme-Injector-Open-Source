@@ -34,6 +34,7 @@ namespace ExtremeInjector.UI
 
         private ContextMenuStrip ctxMenu = null!;
         private int currentSelectedIndex = -1;
+        private int currentSelectedPid = 0;
         private bool isSortAscending = true;
         private ListViewHeaderListener? headerListener;
         private CustomTitleBar titleBar = null!;
@@ -75,8 +76,10 @@ namespace ExtremeInjector.UI
                 Size = new Size(36, 36),
                 SizeMode = PictureBoxSizeMode.StretchImage,
                 BackColor = Color.Transparent,
-                Visible = false
+                Visible = false,
+                Cursor = Cursors.Hand
             };
+            picAppIcon.Click += PicAppIcon_Click;
 
             // 2. Process Selection Controls
             lblProcess = new TransparentLabel
@@ -394,6 +397,7 @@ namespace ExtremeInjector.UI
                 if (processes.Length > 0)
                 {
                     var p = processes[0];
+                    currentSelectedPid = p.Id;
                     string title = "";
                     try
                     {
@@ -441,6 +445,7 @@ namespace ExtremeInjector.UI
                 }
                 else
                 {
+                    currentSelectedPid = 0;
                     lblProcessTitle.Text = name;
                     lblProcessPid.Text = "Process not running";
                     lblProcessTitle.Visible = true;
@@ -450,6 +455,7 @@ namespace ExtremeInjector.UI
             }
             catch
             {
+                currentSelectedPid = 0;
                 lblProcessTitle.Text = name;
                 lblProcessPid.Text = "Process ID: Unknown";
                 lblProcessTitle.Visible = true;
@@ -703,9 +709,37 @@ namespace ExtremeInjector.UI
             using var dlg = new ProcessSelectForm();
             if (dlg.ShowDialog(this) == DialogResult.OK)
             {
+                currentSelectedPid = dlg.SelectedProcessId;
                 txtProcess.Text = dlg.SelectedProcessName;
                 UpdateProcessDetails();
                 UpdateInjectButtonState();
+            }
+        }
+
+        private void PicAppIcon_Click(object? sender, EventArgs e)
+        {
+            string pName = txtProcess.Text.Trim();
+            if (string.IsNullOrEmpty(pName)) return;
+
+            int pid = currentSelectedPid;
+            if (pid <= 0)
+            {
+                try
+                {
+                    var procs = Process.GetProcessesByName(Path.GetFileNameWithoutExtension(pName));
+                    if (procs.Length > 0)
+                    {
+                        pid = procs[0].Id;
+                    }
+                }
+                catch { }
+            }
+
+            if (pid > 0)
+            {
+                using var dlg = new ProcessInformationForm(pid, pName, picAppIcon.Image);
+                dlg.ShowDialog(this);
+                UpdateProcessDetails();
             }
         }
 
