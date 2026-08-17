@@ -48,15 +48,7 @@ namespace ExtremeInjector.UI
             MaximizeBox = false;
             MinimizeBox = false;
             ShowInTaskbar = true;
-            string iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ExtremeInjector.ico");
-            if (File.Exists(iconPath))
-            {
-                try { Icon = new Icon(iconPath); } catch { }
-            }
-            else if (File.Exists("ExtremeInjector.ico"))
-            {
-                try { Icon = new Icon("ExtremeInjector.ico"); } catch { }
-            }
+            Icon = ThemeManager.AppIcon;
             Font = new Font("Segoe UI", 9f);
             BackColor = SystemColors.Control;
 

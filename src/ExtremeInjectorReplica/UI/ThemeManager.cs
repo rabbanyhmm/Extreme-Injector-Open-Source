@@ -12,6 +12,37 @@ namespace ExtremeInjector.UI
         public static Color Background2 { get; set; } = Color.FromArgb(0, 180, 255);
         public static Color TextColor { get; set; } = Color.White;
 
+        private static Icon? _appIcon;
+        public static Icon AppIcon
+        {
+            get
+            {
+                if (_appIcon != null) return _appIcon;
+
+                // 1. Extract directly from embedded assembly manifest resource
+                try
+                {
+                    using var stream = typeof(ThemeManager).Assembly.GetManifestResourceStream("ExtremeInjector.ExtremeInjector.ico");
+                    if (stream != null)
+                    {
+                        _appIcon = new Icon(stream);
+                        return _appIcon;
+                    }
+                }
+                catch { }
+
+                // 2. Extract from own .exe binary directly
+                try
+                {
+                    _appIcon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
+                    if (_appIcon != null) return _appIcon;
+                }
+                catch { }
+
+                return SystemIcons.Application;
+            }
+        }
+
         public static void UpdateColors(string bg1, string bg2, string text)
         {
             try { Background1 = ColorTranslator.FromHtml(bg1); } catch { Background1 = Color.FromArgb(0, 150, 255); }

@@ -18,6 +18,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="ExtremeInjector.ico" />
     <None Update="ExtremeInjector.ico">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

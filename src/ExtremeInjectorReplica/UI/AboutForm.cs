@@ -24,16 +24,7 @@ namespace ExtremeInjector.UI
             ShowInTaskbar = true;
             Font = new Font("Segoe UI", 9f);
             BackColor = SystemColors.Control;
-
-            string iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ExtremeInjector.ico");
-            if (File.Exists(iconPath))
-            {
-                try { Icon = new Icon(iconPath); } catch { }
-            }
-            else if (File.Exists("ExtremeInjector.ico"))
-            {
-                try { Icon = new Icon("ExtremeInjector.ico"); } catch { }
-            }
+            Icon = ThemeManager.AppIcon;
 
             // 1. Top White Header Panel
             var headerPanel = new Panel
@@ -57,10 +48,11 @@ namespace ExtremeInjector.UI
                 BackColor = Color.Transparent
             };
 
-            if (Icon != null)
+            try
             {
-                picIcon.Image = new Icon(Icon, new Size(48, 48)).ToBitmap();
+                picIcon.Image = new Icon(ThemeManager.AppIcon, new Size(48, 48)).ToBitmap();
             }
+            catch { }
 
             // "Extreme Injector" Title
             var lblTitle = new Label

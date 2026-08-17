@@ -61,12 +61,7 @@ namespace ExtremeInjector.UI
             StartPosition = FormStartPosition.CenterParent;
             Font = new Font("Segoe UI", 9f);
             BackColor = Color.FromArgb(240, 240, 240);
-
-            string iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ExtremeInjector.ico");
-            if (File.Exists(iconPath))
-            {
-                try { Icon = new Icon(iconPath); } catch { }
-            }
+            Icon = ThemeManager.AppIcon;
 
             imgList = new ImageList
             {

@@ -59,26 +59,22 @@ namespace ExtremeInjector.UI
             Font = new Font("Segoe UI", 9f);
             DoubleBuffered = true;
 
-            string iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ExtremeInjector.ico");
-            if (File.Exists(iconPath))
-            {
-                try { Icon = new Icon(iconPath); } catch { }
-            }
-            else if (File.Exists("ExtremeInjector.ico"))
-            {
-                try { Icon = new Icon("ExtremeInjector.ico"); } catch { }
-            }
+            Icon = ThemeManager.AppIcon;
 
             // 1. Process Icon (Left)
             picAppIcon = new PictureBox
             {
                 Location = new Point(12, 14),
-                Size = new Size(36, 36),
-                SizeMode = PictureBoxSizeMode.StretchImage,
+                Size = new Size(20, 20),
+                SizeMode = PictureBoxSizeMode.CenterImage,
                 BackColor = Color.Transparent,
-                Visible = false,
                 Cursor = Cursors.Hand
             };
+            try
+            {
+                picAppIcon.Image = new Icon(ThemeManager.AppIcon, new Size(20, 20)).ToBitmap();
+            }
+            catch { }
             picAppIcon.Click += PicAppIcon_Click;
 
             // 2. Process Selection Controls
