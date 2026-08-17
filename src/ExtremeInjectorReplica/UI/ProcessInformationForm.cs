@@ -36,6 +36,7 @@ namespace ExtremeInjector.UI
 
         private Button btnKillProcess = null!;
         private Button btnClose = null!;
+        private Panel pnlBottomButtons = null!;
 
         private readonly Dictionary<int, bool> _suspendedThreads = new();
 
@@ -61,7 +62,7 @@ namespace ExtremeInjector.UI
         private void InitializeComponent()
         {
             Text = "Process Information";
-            Size = new Size(408, 500);
+            Size = new Size(425, 508);
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
             MinimizeBox = false;
@@ -219,12 +220,25 @@ namespace ExtremeInjector.UI
             tabControl.TabPages.Add(tabModules);
             tabControl.TabPages.Add(tabThreads);
 
-            // 3. Bottom Action Buttons
+            // =========================================================================
+            // 3. BOTTOM ACTION BUTTONS (KILL PROCESS / CLOSE)
+            // =========================================================================
+            int bottomBtnWidth = 105;   // ← Width of both buttons
+            int bottomBtnHeight = 26;   // ← Height of both buttons
+            int bottomBtnSpacing = 8;   // ← Spacing between Kill Process and Close
+
+            pnlBottomButtons = new Panel
+            {
+                Location = new Point(164, 430), // ← ADJUST (X, Y) POSITION HERE (Increase Y to move down!)
+                Size = new Size((bottomBtnWidth * 2) + bottomBtnSpacing, bottomBtnHeight + 2),
+                BackColor = Color.Transparent
+            };
+
             btnKillProcess = new Button
             {
                 Text = "Kill Process",
-                Location = new Point(164, 426),
-                Size = new Size(105, 26),
+                Location = new Point(0, 0),
+                Size = new Size(bottomBtnWidth, bottomBtnHeight),
                 FlatStyle = FlatStyle.System,
                 UseVisualStyleBackColor = true
             };
@@ -233,18 +247,22 @@ namespace ExtremeInjector.UI
             btnClose = new Button
             {
                 Text = "Close",
-                Location = new Point(275, 426),
-                Size = new Size(105, 26),
+                Location = new Point(bottomBtnWidth + bottomBtnSpacing, 0),
+                Size = new Size(bottomBtnWidth, bottomBtnHeight),
                 FlatStyle = FlatStyle.System,
                 UseVisualStyleBackColor = true
             };
             btnClose.Click += (s, e) => Close();
 
+            pnlBottomButtons.Controls.AddRange(new Control[] {
+                btnKillProcess,
+                btnClose
+            });
+
             Controls.AddRange(new Control[] {
                 grpProcess,
                 tabControl,
-                btnKillProcess,
-                btnClose
+                pnlBottomButtons
             });
         }
 
