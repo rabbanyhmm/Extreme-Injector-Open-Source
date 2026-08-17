@@ -182,13 +182,17 @@ namespace ExtremeInjector.UI
                 GridLines = true,
                 MultiSelect = false,
                 Font = new Font("Segoe UI", 8.5f),
-                HideSelection = false
+                HideSelection = false,
+                OwnerDraw = true
             };
-            lstModules.Columns.Add("Module Name", 145);
-            lstModules.Columns.Add("Module Base", 115);
-            lstModules.Columns.Add("Module Size", 82);
+            lstModules.Columns.Add("Module Name", 155);
+            lstModules.Columns.Add("Module Base", 120);
+            lstModules.Columns.Add("Module Size", 86);
             lstModules.SelectedIndexChanged += LstModules_SelectedIndexChanged;
             lstModules.ColumnClick += LstModules_ColumnClick;
+            lstModules.DrawColumnHeader += LstModules_DrawColumnHeader;
+            lstModules.DrawItem += (s, e) => e.DrawDefault = true;
+            lstModules.DrawSubItem += (s, e) => e.DrawDefault = true;
 
             btnUnloadModule = new Button
             {
@@ -221,13 +225,17 @@ namespace ExtremeInjector.UI
                 GridLines = true,
                 MultiSelect = false,
                 Font = new Font("Segoe UI", 8.5f),
-                HideSelection = false
+                HideSelection = false,
+                OwnerDraw = true
             };
-            lstThreads.Columns.Add("Thread ID", 78);
-            lstThreads.Columns.Add("Start Address", 176);
-            lstThreads.Columns.Add("Priority", 88);
+            lstThreads.Columns.Add("Thread ID", 85);
+            lstThreads.Columns.Add("Start Address", 185);
+            lstThreads.Columns.Add("Priority", 91);
             lstThreads.SelectedIndexChanged += LstThreads_SelectedIndexChanged;
             lstThreads.ColumnClick += LstThreads_ColumnClick;
+            lstThreads.DrawColumnHeader += LstThreads_DrawColumnHeader;
+            lstThreads.DrawItem += (s, e) => e.DrawDefault = true;
+            lstThreads.DrawSubItem += (s, e) => e.DrawDefault = true;
 
             var pnlThreadButtons = new Panel
             {
@@ -378,9 +386,6 @@ namespace ExtremeInjector.UI
                     : list.OrderByDescending(m => m.Size).ToList();
             }
 
-            // Update column header text with right-side arrow indicator (only if sorted)
-            UpdateRightSideSortHeader(lstModules, _modSortCol, _modSortAsc, ModHeaders);
-
             lstModules.BeginUpdate();
             lstModules.Items.Clear();
             foreach (var mod in list)
@@ -393,6 +398,7 @@ namespace ExtremeInjector.UI
                 lstModules.Items.Add(item);
             }
             lstModules.EndUpdate();
+            lstModules.Invalidate();
         }
 
         private void RenderThreadsList()
@@ -416,9 +422,6 @@ namespace ExtremeInjector.UI
                     : list.OrderByDescending(t => t.Priority, StringComparer.OrdinalIgnoreCase).ToList();
             }
 
-            // Update column header text with right-side arrow indicator (only if sorted)
-            UpdateRightSideSortHeader(lstThreads, _thSortCol, _thSortAsc, ThHeaders);
-
             lstThreads.BeginUpdate();
             lstThreads.Items.Clear();
             foreach (var th in list)
@@ -430,22 +433,56 @@ namespace ExtremeInjector.UI
                 lstThreads.Items.Add(item);
             }
             lstThreads.EndUpdate();
+            lstThreads.Invalidate();
         }
 
-        private static void UpdateRightSideSortHeader(ListView lv, int sortCol, bool sortAsc, string[] originalHeaders)
+        private void LstModules_DrawColumnHeader(object? sender, DrawListViewColumnHeaderEventArgs e)
         {
-            for (int i = 0; i < lv.Columns.Count; i++)
+            e.DrawBackground();
+            e.DrawText(TextFormatFlags.Left | TextFormatFlags.VerticalCenter);
+
+            if (_modSortCol >= 0 && e.ColumnIndex == _modSortCol)
             {
-                string baseTitle = originalHeaders[i];
-                if (sortCol >= 0 && i == sortCol)
-                {
-                    // Show subtle right-aligned arrow on clicked column
-                    lv.Columns[i].Text = $"{baseTitle}   {(sortAsc ? "▲" : "▼")}";
-                }
-                else
-                {
-                    lv.Columns[i].Text = baseTitle;
-                }
+                DrawGraySortArrow(e.Graphics, e.Bounds, _modSortAsc);
+            }
+        }
+
+        private void LstThreads_DrawColumnHeader(object? sender, DrawListViewColumnHeaderEventArgs e)
+        {
+            e.DrawBackground();
+            e.DrawText(TextFormatFlags.Left | TextFormatFlags.VerticalCenter);
+
+            if (_thSortCol >= 0 && e.ColumnIndex == _thSortCol)
+            {
+                DrawGraySortArrow(e.Graphics, e.Bounds, _thSortAsc);
+            }
+        }
+
+        private static void DrawGraySortArrow(Graphics g, Rectangle bounds, bool isAsc)
+        {
+            int arrowX = bounds.Right - 14;
+            int arrowY = bounds.Top + (bounds.Height / 2);
+            using var grayBrush = new SolidBrush(Color.FromArgb(120, 120, 120));
+
+            if (isAsc)
+            {
+                // Crisp upward gray triangle ▲ at right edge of column
+                Point[] pts = {
+                    new Point(arrowX, arrowY + 2),
+                    new Point(arrowX + 8, arrowY + 2),
+                    new Point(arrowX + 4, arrowY - 3)
+                };
+                g.FillPolygon(grayBrush, pts);
+            }
+            else
+            {
+                // Crisp downward gray triangle ▼ at right edge of column
+                Point[] pts = {
+                    new Point(arrowX, arrowY - 2),
+                    new Point(arrowX + 8, arrowY - 2),
+                    new Point(arrowX + 4, arrowY + 3)
+                };
+                g.FillPolygon(grayBrush, pts);
             }
         }
 
