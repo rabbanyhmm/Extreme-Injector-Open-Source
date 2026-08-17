@@ -66,15 +66,11 @@ namespace ExtremeInjector.UI
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
             MinimizeBox = false;
+            ShowIcon = false;
+            ShowInTaskbar = false;
             StartPosition = FormStartPosition.CenterParent;
             Font = new Font("Segoe UI", 9f);
             BackColor = Color.FromArgb(240, 240, 240);
-
-            string iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ExtremeInjector.ico");
-            if (File.Exists(iconPath))
-            {
-                try { Icon = new Icon(iconPath); } catch { }
-            }
 
             // =========================================================================
             // 1. INJECTION METHOD GROUPBOX (TOP LEFT)
