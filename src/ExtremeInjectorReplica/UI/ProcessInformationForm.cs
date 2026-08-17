@@ -145,23 +145,27 @@ namespace ExtremeInjector.UI
             };
 
             // =========================================================================
-            // TAB 1: MODULES CONTROLS
+            // SHARED TAB CONTROLS (TABLE SIZE & BUTTON ROW POSITION)
             // =========================================================================
-            int modTableX = 6;
-            int modTableY = 6;
-            int modTableWidth = 365;
-            int modTableHeight = 200;
+            int tabTableX = 6;
+            int tabTableY = 6;
+            int tabTableWidth = 365;
+            int tabTableHeight = 200; // ← Height of tables in BOTH tabs
 
-            int unloadBtnX = 250;      // ← Unload Module Button X position
-            int unloadBtnY = 212;      // ← Unload Module Button Y position
-            int unloadBtnWidth = 120;  // ← Unload Module Button Width
-            int unloadBtnHeight = 25;  // ← Unload Module Button Height
+            int tabBtnY = 222;        // ← SHARED Y POSITION: Moves Unload Module, Kill, AND Suspend down TOGETHER!
+            int tabBtnHeight = 25;    // ← SHARED Button Height
+
+            // -------------------------------------------------------------------------
+            // TAB 1: MODULES
+            // -------------------------------------------------------------------------
+            int unloadBtnWidth = 120; // ← Width of Unload Module button
+            int unloadBtnX = tabTableX + tabTableWidth - unloadBtnWidth; // Align right with table
 
             tabModules = new TabPage { Text = "Modules", BackColor = Color.White };
             lstModules = new ListView
             {
-                Location = new Point(modTableX, modTableY),
-                Size = new Size(modTableWidth, modTableHeight),
+                Location = new Point(tabTableX, tabTableY),
+                Size = new Size(tabTableWidth, tabTableHeight),
                 View = View.Details,
                 FullRowSelect = true,
                 GridLines = true,
@@ -177,8 +181,8 @@ namespace ExtremeInjector.UI
             btnUnloadModule = new Button
             {
                 Text = "Unload Module",
-                Location = new Point(unloadBtnX, unloadBtnY),
-                Size = new Size(unloadBtnWidth, unloadBtnHeight),
+                Location = new Point(unloadBtnX, tabBtnY),
+                Size = new Size(unloadBtnWidth, tabBtnHeight),
                 FlatStyle = FlatStyle.System,
                 UseVisualStyleBackColor = true,
                 Enabled = false
@@ -187,25 +191,19 @@ namespace ExtremeInjector.UI
 
             tabModules.Controls.AddRange(new Control[] { lstModules, btnUnloadModule });
 
-            // =========================================================================
-            // TAB 2: THREADS CONTROLS
-            // =========================================================================
-            int thTableX = 6;
-            int thTableY = 6;
-            int thTableWidth = 365;
-            int thTableHeight = 200;
-
-            int thBtnWidth = 90;       // ← Width of both Kill and Suspend buttons
-            int thBtnHeight = 25;      // ← Height of both Kill and Suspend buttons
-            int thBtnSpacing = 10;     // ← Spacing between Kill and Suspend
-            int thBtnGroupX = 180;     // ← X position of the Kill & Suspend group
-            int thBtnGroupY = 212;     // ← Y position of the Kill & Suspend group
+            // -------------------------------------------------------------------------
+            // TAB 2: THREADS
+            // -------------------------------------------------------------------------
+            int thBtnWidth = 90;   // ← Width of both Kill and Suspend buttons
+            int thBtnSpacing = 10; // ← Spacing between Kill and Suspend
+            int thGroupWidth = (thBtnWidth * 2) + thBtnSpacing;
+            int thBtnGroupX = tabTableX + tabTableWidth - thGroupWidth; // Align right with table
 
             tabThreads = new TabPage { Text = "Threads", BackColor = Color.White };
             lstThreads = new ListView
             {
-                Location = new Point(thTableX, thTableY),
-                Size = new Size(thTableWidth, thTableHeight),
+                Location = new Point(tabTableX, tabTableY),
+                Size = new Size(tabTableWidth, tabTableHeight),
                 View = View.Details,
                 FullRowSelect = true,
                 GridLines = true,
@@ -220,8 +218,8 @@ namespace ExtremeInjector.UI
 
             var pnlThreadButtons = new Panel
             {
-                Location = new Point(thBtnGroupX, thBtnGroupY),
-                Size = new Size((thBtnWidth * 2) + thBtnSpacing, thBtnHeight + 2),
+                Location = new Point(thBtnGroupX, tabBtnY),
+                Size = new Size(thGroupWidth, tabBtnHeight + 2),
                 BackColor = Color.Transparent
             };
 
@@ -229,7 +227,7 @@ namespace ExtremeInjector.UI
             {
                 Text = "Kill",
                 Location = new Point(0, 0),
-                Size = new Size(thBtnWidth, thBtnHeight),
+                Size = new Size(thBtnWidth, tabBtnHeight),
                 FlatStyle = FlatStyle.System,
                 UseVisualStyleBackColor = true,
                 Enabled = false
@@ -240,7 +238,7 @@ namespace ExtremeInjector.UI
             {
                 Text = "Suspend",
                 Location = new Point(thBtnWidth + thBtnSpacing, 0),
-                Size = new Size(thBtnWidth, thBtnHeight),
+                Size = new Size(thBtnWidth, tabBtnHeight),
                 FlatStyle = FlatStyle.System,
                 UseVisualStyleBackColor = true,
                 Enabled = false
