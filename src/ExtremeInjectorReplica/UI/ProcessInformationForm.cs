@@ -140,16 +140,28 @@ namespace ExtremeInjector.UI
             tabControl = new TabControl
             {
                 Location = new Point(12, 146),
-                Size = new Size(368, 272),
+                Size = new Size(385, 280),
                 Font = new Font("Segoe UI", 9f)
             };
 
-            // Tab 1: Modules
+            // =========================================================================
+            // TAB 1: MODULES CONTROLS
+            // =========================================================================
+            int modTableX = 6;
+            int modTableY = 6;
+            int modTableWidth = 365;
+            int modTableHeight = 200;
+
+            int unloadBtnX = 250;      // ← Unload Module Button X position
+            int unloadBtnY = 212;      // ← Unload Module Button Y position
+            int unloadBtnWidth = 120;  // ← Unload Module Button Width
+            int unloadBtnHeight = 25;  // ← Unload Module Button Height
+
             tabModules = new TabPage { Text = "Modules", BackColor = Color.White };
             lstModules = new ListView
             {
-                Location = new Point(6, 6),
-                Size = new Size(348, 196),
+                Location = new Point(modTableX, modTableY),
+                Size = new Size(modTableWidth, modTableHeight),
                 View = View.Details,
                 FullRowSelect = true,
                 GridLines = true,
@@ -158,15 +170,15 @@ namespace ExtremeInjector.UI
                 HideSelection = false
             };
             lstModules.Columns.Add("Module Name", 145);
-            lstModules.Columns.Add("Module Base", 115);
-            lstModules.Columns.Add("Module Size", 82);
+            lstModules.Columns.Add("Module Base", 120);
+            lstModules.Columns.Add("Module Size", 90);
             lstModules.SelectedIndexChanged += LstModules_SelectedIndexChanged;
 
             btnUnloadModule = new Button
             {
                 Text = "Unload Module",
-                Location = new Point(234, 206),
-                Size = new Size(120, 25),
+                Location = new Point(unloadBtnX, unloadBtnY),
+                Size = new Size(unloadBtnWidth, unloadBtnHeight),
                 FlatStyle = FlatStyle.System,
                 UseVisualStyleBackColor = true,
                 Enabled = false
@@ -175,12 +187,25 @@ namespace ExtremeInjector.UI
 
             tabModules.Controls.AddRange(new Control[] { lstModules, btnUnloadModule });
 
-            // Tab 2: Threads
+            // =========================================================================
+            // TAB 2: THREADS CONTROLS
+            // =========================================================================
+            int thTableX = 6;
+            int thTableY = 6;
+            int thTableWidth = 365;
+            int thTableHeight = 200;
+
+            int thBtnWidth = 90;       // ← Width of both Kill and Suspend buttons
+            int thBtnHeight = 25;      // ← Height of both Kill and Suspend buttons
+            int thBtnSpacing = 10;     // ← Spacing between Kill and Suspend
+            int thBtnGroupX = 180;     // ← X position of the Kill & Suspend group
+            int thBtnGroupY = 212;     // ← Y position of the Kill & Suspend group
+
             tabThreads = new TabPage { Text = "Threads", BackColor = Color.White };
             lstThreads = new ListView
             {
-                Location = new Point(6, 6),
-                Size = new Size(348, 196),
+                Location = new Point(thTableX, thTableY),
+                Size = new Size(thTableWidth, thTableHeight),
                 View = View.Details,
                 FullRowSelect = true,
                 GridLines = true,
@@ -189,15 +214,22 @@ namespace ExtremeInjector.UI
                 HideSelection = false
             };
             lstThreads.Columns.Add("Thread ID", 85);
-            lstThreads.Columns.Add("Start Address", 160);
+            lstThreads.Columns.Add("Start Address", 175);
             lstThreads.Columns.Add("Priority", 95);
             lstThreads.SelectedIndexChanged += LstThreads_SelectedIndexChanged;
+
+            var pnlThreadButtons = new Panel
+            {
+                Location = new Point(thBtnGroupX, thBtnGroupY),
+                Size = new Size((thBtnWidth * 2) + thBtnSpacing, thBtnHeight + 2),
+                BackColor = Color.Transparent
+            };
 
             btnKillThread = new Button
             {
                 Text = "Kill",
-                Location = new Point(164, 206),
-                Size = new Size(90, 25),
+                Location = new Point(0, 0),
+                Size = new Size(thBtnWidth, thBtnHeight),
                 FlatStyle = FlatStyle.System,
                 UseVisualStyleBackColor = true,
                 Enabled = false
@@ -207,15 +239,16 @@ namespace ExtremeInjector.UI
             btnSuspendThread = new Button
             {
                 Text = "Suspend",
-                Location = new Point(264, 206),
-                Size = new Size(90, 25),
+                Location = new Point(thBtnWidth + thBtnSpacing, 0),
+                Size = new Size(thBtnWidth, thBtnHeight),
                 FlatStyle = FlatStyle.System,
                 UseVisualStyleBackColor = true,
                 Enabled = false
             };
             btnSuspendThread.Click += BtnSuspendThread_Click;
 
-            tabThreads.Controls.AddRange(new Control[] { lstThreads, btnKillThread, btnSuspendThread });
+            pnlThreadButtons.Controls.AddRange(new Control[] { btnKillThread, btnSuspendThread });
+            tabThreads.Controls.AddRange(new Control[] { lstThreads, pnlThreadButtons });
 
             tabControl.TabPages.Add(tabModules);
             tabControl.TabPages.Add(tabThreads);
@@ -224,12 +257,12 @@ namespace ExtremeInjector.UI
             // 3. BOTTOM ACTION BUTTONS (KILL PROCESS / CLOSE)
             // =========================================================================
             int bottomBtnWidth = 105;   // ← Width of both buttons
-            int bottomBtnHeight = 26;   // ← Height of both buttons
+            int bottomBtnHeight = 20;   // ← Height of both buttons
             int bottomBtnSpacing = 8;   // ← Spacing between Kill Process and Close
 
             pnlBottomButtons = new Panel
             {
-                Location = new Point(164, 430), // ← ADJUST (X, Y) POSITION HERE (Increase Y to move down!)
+                Location = new Point(164, 442), // ← ADJUST (X, Y) POSITION HERE (Increase Y to move down!)
                 Size = new Size((bottomBtnWidth * 2) + bottomBtnSpacing, bottomBtnHeight + 2),
                 BackColor = Color.Transparent
             };
