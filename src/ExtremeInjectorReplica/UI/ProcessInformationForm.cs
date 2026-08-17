@@ -48,6 +48,9 @@ namespace ExtremeInjector.UI
         private int _thSortCol = 0;
         private bool _thSortAsc = true;
 
+        private static readonly string[] ModHeaders = { "Module Name", "Module Base", "Module Size" };
+        private static readonly string[] ThHeaders = { "Thread ID", "Start Address", "Priority" };
+
         public ProcessInformationForm(int processId, string processName, Image? processIcon = null)
         {
             _processId = processId;
@@ -65,28 +68,6 @@ namespace ExtremeInjector.UI
             }
 
             LoadProcessInformation();
-        }
-
-        protected override void OnHandleCreated(EventArgs e)
-        {
-            base.OnHandleCreated(e);
-            ApplyExplorerTheme();
-        }
-
-        private void ApplyExplorerTheme()
-        {
-            try
-            {
-                if (lstModules.IsHandleCreated)
-                {
-                    SetWindowTheme(lstModules.Handle, "Explorer", null);
-                }
-                if (lstThreads.IsHandleCreated)
-                {
-                    SetWindowTheme(lstThreads.Handle, "Explorer", null);
-                }
-            }
-            catch { }
         }
 
         private void InitializeComponent()
@@ -360,7 +341,7 @@ namespace ExtremeInjector.UI
                 // 1. Enumerate Modules using rock-solid Win32 PsApi & Toolhelp fallback
                 _cachedModules = EnumerateModulesNative(_processId);
 
-                // 2. Enumerate Threads
+                // 2. Enumerate Threads with Export Symbol Resolution
                 _cachedThreads = EnumerateThreadsNative(_processId, _cachedModules);
 
                 lblModulesThreads.Text = $"Modules: {_cachedModules.Count}  Threads: {_cachedThreads.Count}";
@@ -397,6 +378,9 @@ namespace ExtremeInjector.UI
                     : list.OrderByDescending(m => m.Size).ToList();
             }
 
+            // Update column header text with right-side arrow indicator
+            UpdateRightSideSortHeader(lstModules, _modSortCol, _modSortAsc, ModHeaders);
+
             lstModules.BeginUpdate();
             lstModules.Items.Clear();
             foreach (var mod in list)
@@ -409,9 +393,6 @@ namespace ExtremeInjector.UI
                 lstModules.Items.Add(item);
             }
             lstModules.EndUpdate();
-
-            // Set native Windows Explorer sort arrow on the header
-            SetSortIcon(lstModules, _modSortCol, _modSortAsc ? SortOrder.Ascending : SortOrder.Descending);
         }
 
         private void RenderThreadsList()
@@ -435,6 +416,9 @@ namespace ExtremeInjector.UI
                     : list.OrderByDescending(t => t.Priority, StringComparer.OrdinalIgnoreCase).ToList();
             }
 
+            // Update column header text with right-side arrow indicator
+            UpdateRightSideSortHeader(lstThreads, _thSortCol, _thSortAsc, ThHeaders);
+
             lstThreads.BeginUpdate();
             lstThreads.Items.Clear();
             foreach (var th in list)
@@ -446,32 +430,21 @@ namespace ExtremeInjector.UI
                 lstThreads.Items.Add(item);
             }
             lstThreads.EndUpdate();
-
-            // Set native Windows Explorer sort arrow on the header
-            SetSortIcon(lstThreads, _thSortCol, _thSortAsc ? SortOrder.Ascending : SortOrder.Descending);
         }
 
-        private static void SetSortIcon(ListView lv, int columnIndex, SortOrder order)
+        private static void UpdateRightSideSortHeader(ListView lv, int sortCol, bool sortAsc, string[] originalHeaders)
         {
-            if (!lv.IsHandleCreated) return;
-            IntPtr hHeader = SendMessage(lv.Handle, LVM_GETHEADER, IntPtr.Zero, IntPtr.Zero);
-            if (hHeader == IntPtr.Zero) return;
-
             for (int i = 0; i < lv.Columns.Count; i++)
             {
-                var item = new HDITEM { mask = HDI_FORMAT };
-                if (SendMessageHD(hHeader, HDM_GETITEMW, (IntPtr)i, ref item) != IntPtr.Zero)
+                string baseTitle = originalHeaders[i];
+                if (i == sortCol)
                 {
-                    if (i == columnIndex && order != SortOrder.None)
-                    {
-                        item.fmt &= ~(HDF_SORTUP | HDF_SORTDOWN);
-                        item.fmt |= (order == SortOrder.Ascending) ? HDF_SORTUP : HDF_SORTDOWN;
-                    }
-                    else
-                    {
-                        item.fmt &= ~(HDF_SORTUP | HDF_SORTDOWN);
-                    }
-                    SendMessageHD(hHeader, HDM_SETITEMW, (IntPtr)i, ref item);
+                    // Right-side clean arrow aligned next to the title
+                    lv.Columns[i].Text = baseTitle + (sortAsc ? "   ▲" : "   ▼");
+                }
+                else
+                {
+                    lv.Columns[i].Text = baseTitle;
                 }
             }
         }
@@ -528,6 +501,126 @@ namespace ExtremeInjector.UI
             };
         }
 
+        #region PE Export Parser for Start Address Symbol Resolution
+
+        private static readonly Dictionary<string, List<(string Name, uint RVA)>> _moduleExportsCache = new(StringComparer.OrdinalIgnoreCase);
+
+        private static List<(string Name, uint RVA)> GetModuleExports(string filePath)
+        {
+            if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath)) return new();
+            if (_moduleExportsCache.TryGetValue(filePath, out var cached)) return cached;
+
+            var exports = new List<(string Name, uint RVA)>();
+            try
+            {
+                using var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                using var reader = new BinaryReader(fs);
+
+                if (reader.ReadUInt16() != 0x5A4D) return exports; // 'MZ'
+                fs.Seek(0x3C, SeekOrigin.Begin);
+                uint e_lfanew = reader.ReadUInt32();
+
+                fs.Seek(e_lfanew, SeekOrigin.Begin);
+                if (reader.ReadUInt32() != 0x00004550) return exports; // 'PE\0\0'
+
+                ushort machine = reader.ReadUInt16();
+                ushort numSections = reader.ReadUInt16();
+                fs.Seek(12, SeekOrigin.Current);
+                ushort sizeOfOptHeader = reader.ReadUInt16();
+                ushort characteristics = reader.ReadUInt16();
+
+                long optHeaderStart = fs.Position;
+                ushort magic = reader.ReadUInt16();
+                bool is64 = (magic == 0x020B);
+
+                uint exportRva = 0;
+                if (is64)
+                {
+                    fs.Seek(optHeaderStart + 112, SeekOrigin.Begin);
+                    exportRva = reader.ReadUInt32();
+                }
+                else
+                {
+                    fs.Seek(optHeaderStart + 96, SeekOrigin.Begin);
+                    exportRva = reader.ReadUInt32();
+                }
+
+                if (exportRva == 0) return exports;
+
+                long sectionHeaderStart = optHeaderStart + sizeOfOptHeader;
+                var sections = new List<(uint VirtAddr, uint VirtSize, uint RawOffset)>();
+                for (int i = 0; i < numSections; i++)
+                {
+                    fs.Seek(sectionHeaderStart + (i * 40), SeekOrigin.Begin);
+                    fs.Seek(8, SeekOrigin.Current);
+                    uint virtSize = reader.ReadUInt32();
+                    uint virtAddr = reader.ReadUInt32();
+                    uint rawSize = reader.ReadUInt32();
+                    uint rawOffset = reader.ReadUInt32();
+                    sections.Add((virtAddr, virtSize, rawOffset));
+                }
+
+                long RvaToOffset(uint rva)
+                {
+                    foreach (var sec in sections)
+                    {
+                        if (rva >= sec.VirtAddr && rva < sec.VirtAddr + sec.VirtSize)
+                        {
+                            return sec.RawOffset + (rva - sec.VirtAddr);
+                        }
+                    }
+                    return -1;
+                }
+
+                long exportOffset = RvaToOffset(exportRva);
+                if (exportOffset == -1) return exports;
+
+                fs.Seek(exportOffset + 24, SeekOrigin.Begin);
+                uint numFunctions = reader.ReadUInt32();
+                uint numNames = reader.ReadUInt32();
+                uint addrOfFunctions = reader.ReadUInt32();
+                uint addrOfNames = reader.ReadUInt32();
+                uint addrOfNameOrdinals = reader.ReadUInt32();
+
+                long nameArrayOffset = RvaToOffset(addrOfNames);
+                long ordinalArrayOffset = RvaToOffset(addrOfNameOrdinals);
+                long funcArrayOffset = RvaToOffset(addrOfFunctions);
+
+                if (nameArrayOffset != -1 && ordinalArrayOffset != -1 && funcArrayOffset != -1)
+                {
+                    for (uint i = 0; i < numNames; i++)
+                    {
+                        fs.Seek(nameArrayOffset + (i * 4), SeekOrigin.Begin);
+                        uint nameRva = reader.ReadUInt32();
+                        long nameOffset = RvaToOffset(nameRva);
+                        if (nameOffset == -1) continue;
+
+                        fs.Seek(ordinalArrayOffset + (i * 2), SeekOrigin.Begin);
+                        ushort ordinal = reader.ReadUInt16();
+
+                        fs.Seek(funcArrayOffset + (ordinal * 4), SeekOrigin.Begin);
+                        uint funcRva = reader.ReadUInt32();
+
+                        fs.Seek(nameOffset, SeekOrigin.Begin);
+                        var sb = new StringBuilder();
+                        byte b;
+                        while ((b = reader.ReadByte()) != 0)
+                        {
+                            sb.Append((char)b);
+                        }
+
+                        exports.Add((sb.ToString(), funcRva));
+                    }
+                }
+
+                exports.Sort((a, b) => a.RVA.CompareTo(b.RVA));
+            }
+            catch { }
+
+            _moduleExportsCache[filePath] = exports;
+            return exports;
+        }
+
         private static string ResolveAddress(IntPtr address, List<ModuleInfo> modules)
         {
             long addr = address.ToInt64();
@@ -536,13 +629,42 @@ namespace ExtremeInjector.UI
                 long baseAddr = mod.BaseAddress.ToInt64();
                 if (addr >= baseAddr && addr < baseAddr + mod.Size)
                 {
-                    long offset = addr - baseAddr;
-                    return $"{mod.Name}+0x{offset:X}";
+                    uint rva = (uint)(addr - baseAddr);
+                    var exports = GetModuleExports(mod.Path);
+
+                    string? bestExport = null;
+                    uint bestExportRva = 0;
+                    for (int i = exports.Count - 1; i >= 0; i--)
+                    {
+                        if (exports[i].RVA <= rva)
+                        {
+                            bestExport = exports[i].Name;
+                            bestExportRva = exports[i].RVA;
+                            break;
+                        }
+                    }
+
+                    if (!string.IsNullOrEmpty(bestExport))
+                    {
+                        uint diff = rva - bestExportRva;
+                        if (diff == 0)
+                        {
+                            return $"{mod.Name}!{bestExport}";
+                        }
+                        else if (diff < 0x4000)
+                        {
+                            return $"{mod.Name}!{bestExport}+0x{diff:X}";
+                        }
+                    }
+
+                    return $"{mod.Name}+0x{rva:X}";
                 }
             }
 
             return $"0x{addr:X}";
         }
+
+        #endregion
 
         private void LstModules_SelectedIndexChanged(object? sender, EventArgs e)
         {
@@ -680,7 +802,6 @@ namespace ExtremeInjector.UI
         {
             var list = new List<ModuleInfo>();
 
-            // 1. Try PsApi EnumProcessModulesEx (Works for 32-bit & 64-bit processes)
             IntPtr hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, false, pid);
             if (hProcess != IntPtr.Zero)
             {
@@ -732,7 +853,6 @@ namespace ExtremeInjector.UI
                 }
             }
 
-            // 2. Fallback to Toolhelp32Snapshot if EnumProcessModulesEx returned nothing
             if (list.Count == 0)
             {
                 list = EnumerateModulesFallback(pid);
@@ -970,45 +1090,12 @@ namespace ExtremeInjector.UI
             public IntPtr EntryPoint;
         }
 
-        private const int LVM_GETHEADER = 0x101F;
-        private const int HDM_GETITEMW = 0x120B;
-        private const int HDM_SETITEMW = 0x120C;
-        private const int HDI_FORMAT = 0x0004;
-        private const int HDF_SORTUP = 0x0400;
-        private const int HDF_SORTDOWN = 0x0200;
-
-        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
-        private struct HDITEM
-        {
-            public uint mask;
-            public int cxy;
-            public IntPtr pszText;
-            public IntPtr hbm;
-            public int cchTextMax;
-            public int fmt;
-            public IntPtr lParam;
-            public int iImage;
-            public int iOrder;
-            public uint type;
-            public IntPtr pvFilter;
-            public uint state;
-        }
-
         private const uint PROCESS_CREATE_THREAD = 0x0002;
         private const uint PROCESS_VM_OPERATION = 0x0008;
         private const uint PROCESS_VM_READ = 0x0010;
         private const uint PROCESS_VM_WRITE = 0x0020;
         private const uint PROCESS_QUERY_INFORMATION = 0x0400;
         private const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
-
-        [DllImport("uxtheme.dll", CharSet = CharSet.Unicode, ExactSpelling = true)]
-        private static extern int SetWindowTheme(IntPtr hWnd, string pszSubAppName, string? pszSubIdList);
-
-        [DllImport("user32.dll", EntryPoint = "SendMessageW")]
-        private static extern IntPtr SendMessageHD(IntPtr hWnd, uint Msg, IntPtr wParam, ref HDITEM lParam);
-
-        [DllImport("user32.dll", CharSet = CharSet.Auto)]
-        private static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
 
         [DllImport("kernel32.dll", SetLastError = true)]
         private static extern IntPtr OpenProcess(uint processAccess, bool bInheritHandle, int processId);
