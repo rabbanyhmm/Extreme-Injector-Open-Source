@@ -151,7 +151,7 @@ namespace ExtremeInjector.UI
             // Populate existing parameters
             if (!string.IsNullOrEmpty(parameters))
             {
-                string[] entries = parameters.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
+                string[] entries = parameters!.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
                 foreach (var entry in entries)
                 {
                     int colon = entry.IndexOf(':');
