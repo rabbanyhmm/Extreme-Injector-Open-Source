@@ -67,6 +67,28 @@ namespace ExtremeInjector.UI
             LoadProcessInformation();
         }
 
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            ApplyExplorerTheme();
+        }
+
+        private void ApplyExplorerTheme()
+        {
+            try
+            {
+                if (lstModules.IsHandleCreated)
+                {
+                    SetWindowTheme(lstModules.Handle, "Explorer", null);
+                }
+                if (lstThreads.IsHandleCreated)
+                {
+                    SetWindowTheme(lstThreads.Handle, "Explorer", null);
+                }
+            }
+            catch { }
+        }
+
         private void InitializeComponent()
         {
             Text = "Process Information";
@@ -375,9 +397,6 @@ namespace ExtremeInjector.UI
                     : list.OrderByDescending(m => m.Size).ToList();
             }
 
-            // Update column headers with sort arrow
-            UpdateColumnHeaderSort(lstModules, _modSortCol, _modSortAsc, new[] { "Module Name", "Module Base", "Module Size" });
-
             lstModules.BeginUpdate();
             lstModules.Items.Clear();
             foreach (var mod in list)
@@ -390,6 +409,9 @@ namespace ExtremeInjector.UI
                 lstModules.Items.Add(item);
             }
             lstModules.EndUpdate();
+
+            // Set native Windows Explorer sort arrow on the header
+            SetSortIcon(lstModules, _modSortCol, _modSortAsc ? SortOrder.Ascending : SortOrder.Descending);
         }
 
         private void RenderThreadsList()
@@ -413,8 +435,6 @@ namespace ExtremeInjector.UI
                     : list.OrderByDescending(t => t.Priority, StringComparer.OrdinalIgnoreCase).ToList();
             }
 
-            UpdateColumnHeaderSort(lstThreads, _thSortCol, _thSortAsc, new[] { "Thread ID", "Start Address", "Priority" });
-
             lstThreads.BeginUpdate();
             lstThreads.Items.Clear();
             foreach (var th in list)
@@ -426,20 +446,32 @@ namespace ExtremeInjector.UI
                 lstThreads.Items.Add(item);
             }
             lstThreads.EndUpdate();
+
+            // Set native Windows Explorer sort arrow on the header
+            SetSortIcon(lstThreads, _thSortCol, _thSortAsc ? SortOrder.Ascending : SortOrder.Descending);
         }
 
-        private static void UpdateColumnHeaderSort(ListView lv, int sortCol, bool sortAsc, string[] originalHeaders)
+        private static void SetSortIcon(ListView lv, int columnIndex, SortOrder order)
         {
+            if (!lv.IsHandleCreated) return;
+            IntPtr hHeader = SendMessage(lv.Handle, LVM_GETHEADER, IntPtr.Zero, IntPtr.Zero);
+            if (hHeader == IntPtr.Zero) return;
+
             for (int i = 0; i < lv.Columns.Count; i++)
             {
-                string baseTitle = originalHeaders[i];
-                if (i == sortCol)
+                var item = new HDITEM { mask = HDI_FORMAT };
+                if (SendMessageHD(hHeader, HDM_GETITEMW, (IntPtr)i, ref item) != IntPtr.Zero)
                 {
-                    lv.Columns[i].Text = baseTitle + (sortAsc ? " ▲" : " ▼");
-                }
-                else
-                {
-                    lv.Columns[i].Text = baseTitle;
+                    if (i == columnIndex && order != SortOrder.None)
+                    {
+                        item.fmt &= ~(HDF_SORTUP | HDF_SORTDOWN);
+                        item.fmt |= (order == SortOrder.Ascending) ? HDF_SORTUP : HDF_SORTDOWN;
+                    }
+                    else
+                    {
+                        item.fmt &= ~(HDF_SORTUP | HDF_SORTDOWN);
+                    }
+                    SendMessageHD(hHeader, HDM_SETITEMW, (IntPtr)i, ref item);
                 }
             }
         }
@@ -938,12 +970,45 @@ namespace ExtremeInjector.UI
             public IntPtr EntryPoint;
         }
 
+        private const int LVM_GETHEADER = 0x101F;
+        private const int HDM_GETITEMW = 0x120B;
+        private const int HDM_SETITEMW = 0x120C;
+        private const int HDI_FORMAT = 0x0004;
+        private const int HDF_SORTUP = 0x0400;
+        private const int HDF_SORTDOWN = 0x0200;
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        private struct HDITEM
+        {
+            public uint mask;
+            public int cxy;
+            public IntPtr pszText;
+            public IntPtr hbm;
+            public int cchTextMax;
+            public int fmt;
+            public IntPtr lParam;
+            public int iImage;
+            public int iOrder;
+            public uint type;
+            public IntPtr pvFilter;
+            public uint state;
+        }
+
         private const uint PROCESS_CREATE_THREAD = 0x0002;
         private const uint PROCESS_VM_OPERATION = 0x0008;
         private const uint PROCESS_VM_READ = 0x0010;
         private const uint PROCESS_VM_WRITE = 0x0020;
         private const uint PROCESS_QUERY_INFORMATION = 0x0400;
         private const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
+
+        [DllImport("uxtheme.dll", CharSet = CharSet.Unicode, ExactSpelling = true)]
+        private static extern int SetWindowTheme(IntPtr hWnd, string pszSubAppName, string? pszSubIdList);
+
+        [DllImport("user32.dll", EntryPoint = "SendMessageW")]
+        private static extern IntPtr SendMessageHD(IntPtr hWnd, uint Msg, IntPtr wParam, ref HDITEM lParam);
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto)]
+        private static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
 
         [DllImport("kernel32.dll", SetLastError = true)]
         private static extern IntPtr OpenProcess(uint processAccess, bool bInheritHandle, int processId);
