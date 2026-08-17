@@ -1,11 +1,15 @@
 # Extreme Injector (Open Source)
 
 [![Status](https://img.shields.io/badge/Status-In%20Development-orange)](https://github.com/rabbanyhmm/Extreme-Injector-Open-Source)
-[![.NET 9.0](https://img.shields.io/badge/.NET-9.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
+[![.NET Framework 4.8](https://img.shields.io/badge/.NET%20Framework-4.8-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20(x86%20%2F%20x64)-0078D6?logo=windows)](https://microsoft.com/windows)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-An open-source recreation of **Extreme Injector v3**, developed in C# on **.NET 9 (Windows Forms)** using native Win32/NT APIs.
+An open-source recreation of **Extreme Injector v3**, developed in C# on **.NET Framework 4.8 (Windows Forms)** using native Win32/NT APIs.
+
+<p align="center">
+  <img src="Screenshot.png" alt="Extreme Injector UI" width="380">
+</p>
 
 > **Note**: This project is an ongoing, community-driven effort aiming to achieve full functional and visual parity with the original software. It is not an official source release.
 
