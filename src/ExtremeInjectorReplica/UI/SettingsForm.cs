@@ -437,13 +437,13 @@ namespace ExtremeInjector.UI
         private void LoadFromConfig()
         {
             var opt = SettingsManager.Current.Options;
-            cmbMethod.SelectedIndex = Math.Clamp(opt.Method, 0, 4);
+            cmbMethod.SelectedIndex = Math.Max(0, Math.Min(opt.Method, 4));
 
             chkAutoInject.Checked = opt.AutoInject;
             chkCloseOnInject.Checked = opt.CloseOnInject;
             chkStealthInject.Checked = opt.StealthInject;
-            numInjectDelay.Value = Math.Clamp(opt.Delay, 0, 60000);
-            numDelayBetween.Value = Math.Clamp(opt.DelayBetween, 0, 60000);
+            numInjectDelay.Value = Math.Max(0, Math.Min(opt.Delay, 60000));
+            numDelayBetween.Value = Math.Max(0, Math.Min(opt.DelayBetween, 60000));
 
             chkErasePE.Checked = opt.ErasePE;
             chkHideModule.Checked = opt.HideModule;

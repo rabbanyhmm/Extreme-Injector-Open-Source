@@ -783,7 +783,7 @@ namespace ExtremeInjector.UI
                 lstDlls.Items.RemoveAt(targetIndex);
             }
 
-            currentSelectedIndex = lstDlls.Items.Count > 0 ? Math.Clamp(targetIndex, 0, lstDlls.Items.Count - 1) : -1;
+            currentSelectedIndex = lstDlls.Items.Count > 0 ? Math.Max(0, Math.Min(targetIndex, lstDlls.Items.Count - 1)) : -1;
 
             SaveModulesList();
             UpdateInjectButtonState();
