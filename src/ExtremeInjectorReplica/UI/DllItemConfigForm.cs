@@ -64,7 +64,7 @@ namespace ExtremeInjector.UI
             {
                 Text = "Export Options",
                 Location = new Point(8, 6),
-                Size = new Size(228, 260)
+                Size = new Size(253, 260)
             };
 
             lblExport = new Label
@@ -77,7 +77,7 @@ namespace ExtremeInjector.UI
             cmbExport = new ComboBox
             {
                 Location = new Point(8, 36),
-                Size = new Size(212, 23),
+                Size = new Size(237, 23),
                 DropDownStyle = ComboBoxStyle.DropDownList
             };
 
@@ -103,7 +103,7 @@ namespace ExtremeInjector.UI
             cmbCallingConvention = new ComboBox
             {
                 Location = new Point(8, 83),
-                Size = new Size(212, 23),
+                Size = new Size(237, 23),
                 DropDownStyle = ComboBoxStyle.DropDownList
             };
             cmbCallingConvention.Items.AddRange(new object[] { "StdCall", "Cdecl", "FastCall", "ThisCall" });
@@ -119,14 +119,14 @@ namespace ExtremeInjector.UI
             lstParams = new ListView
             {
                 Location = new Point(8, 130),
-                Size = new Size(212, 90),
+                Size = new Size(237, 90),
                 View = View.Details,
                 FullRowSelect = true,
                 GridLines = true,
                 HeaderStyle = ColumnHeaderStyle.Nonclickable
             };
-            lstParams.Columns.Add("Type", 74);
-            lstParams.Columns.Add("Value", 134);
+            lstParams.Columns.Add("Type", 80);
+            lstParams.Columns.Add("Value", 153);
 
             var ctxParams = new ContextMenuStrip();
             ctxParams.Items.Add("Remove", null, (s, e) =>
@@ -182,14 +182,14 @@ namespace ExtremeInjector.UI
             txtParamValue = new TextBox
             {
                 Location = new Point(86, 226),
-                Size = new Size(86, 23)
+                Size = new Size(108, 23)
             };
 
             btnAddParam = new Button
             {
                 Text = "Add",
-                Location = new Point(176, 225),
-                Size = new Size(44, 24),
+                Location = new Point(198, 225),
+                Size = new Size(47, 25),
                 FlatStyle = FlatStyle.System,
                 UseVisualStyleBackColor = true
             };
