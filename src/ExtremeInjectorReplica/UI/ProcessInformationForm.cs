@@ -42,10 +42,10 @@ namespace ExtremeInjector.UI
         private List<ModuleInfo> _cachedModules = new();
         private List<ThreadInfo> _cachedThreads = new();
 
-        // Sort tracking
-        private int _modSortCol = 0;
+        // Sort tracking (-1 = no sort arrow on startup until clicked)
+        private int _modSortCol = -1;
         private bool _modSortAsc = true;
-        private int _thSortCol = 0;
+        private int _thSortCol = -1;
         private bool _thSortAsc = true;
 
         private static readonly string[] ModHeaders = { "Module Name", "Module Base", "Module Size" };
@@ -185,8 +185,8 @@ namespace ExtremeInjector.UI
                 HideSelection = false
             };
             lstModules.Columns.Add("Module Name", 145);
-            lstModules.Columns.Add("Module Base", 125);
-            lstModules.Columns.Add("Module Size", 80);
+            lstModules.Columns.Add("Module Base", 115);
+            lstModules.Columns.Add("Module Size", 82);
             lstModules.SelectedIndexChanged += LstModules_SelectedIndexChanged;
             lstModules.ColumnClick += LstModules_ColumnClick;
 
@@ -223,9 +223,9 @@ namespace ExtremeInjector.UI
                 Font = new Font("Segoe UI", 8.5f),
                 HideSelection = false
             };
-            lstThreads.Columns.Add("Thread ID", 85);
-            lstThreads.Columns.Add("Start Address", 175);
-            lstThreads.Columns.Add("Priority", 90);
+            lstThreads.Columns.Add("Thread ID", 78);
+            lstThreads.Columns.Add("Start Address", 176);
+            lstThreads.Columns.Add("Priority", 88);
             lstThreads.SelectedIndexChanged += LstThreads_SelectedIndexChanged;
             lstThreads.ColumnClick += LstThreads_ColumnClick;
 
@@ -378,7 +378,7 @@ namespace ExtremeInjector.UI
                     : list.OrderByDescending(m => m.Size).ToList();
             }
 
-            // Update column header text with right-side arrow indicator
+            // Update column header text with right-side arrow indicator (only if sorted)
             UpdateRightSideSortHeader(lstModules, _modSortCol, _modSortAsc, ModHeaders);
 
             lstModules.BeginUpdate();
@@ -416,7 +416,7 @@ namespace ExtremeInjector.UI
                     : list.OrderByDescending(t => t.Priority, StringComparer.OrdinalIgnoreCase).ToList();
             }
 
-            // Update column header text with right-side arrow indicator
+            // Update column header text with right-side arrow indicator (only if sorted)
             UpdateRightSideSortHeader(lstThreads, _thSortCol, _thSortAsc, ThHeaders);
 
             lstThreads.BeginUpdate();
@@ -437,10 +437,10 @@ namespace ExtremeInjector.UI
             for (int i = 0; i < lv.Columns.Count; i++)
             {
                 string baseTitle = originalHeaders[i];
-                if (i == sortCol)
+                if (sortCol >= 0 && i == sortCol)
                 {
-                    // Space out arrow towards the right side of the column header
-                    lv.Columns[i].Text = $"{baseTitle}               {(sortAsc ? "▲" : "▼")}";
+                    // Show subtle right-aligned arrow on clicked column
+                    lv.Columns[i].Text = $"{baseTitle}   {(sortAsc ? "▲" : "▼")}";
                 }
                 else
                 {
