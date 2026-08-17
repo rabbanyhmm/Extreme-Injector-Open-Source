@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <ApplicationIcon>ExtremeInjector.ico</ApplicationIcon>
+    <RootNamespace>ExtremeInjector</RootNamespace>
+    <AssemblyName>Extreme Injector v3</AssemblyName>
+    <Authors>rabbanyhmm</Authors>
+    <Company>rabbanyhmm</Company>
+    <Product>Extreme Injector</Product>
+    <RepositoryUrl>https://github.com/rabbanyhmm/Extreme-Injector-Open-Source</RepositoryUrl>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Update="ExtremeInjector.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>

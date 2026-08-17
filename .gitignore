@@ -1,0 +1,33 @@
+## Visual Studio / .NET
+[Bb]in/
+[Oo]bj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.vs/
+.vscode/
+
+## Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+build/
+*.pdb
+*.dll.config
+
+## Reverse Engineering / Scratch Analysis Dumps
+Extreme.Injector.v3.7.3.-.by.master131/
+*.bin
+manifest.xml
+settings.xml
+icon_*.ico
+app_icon.png
+
+## OS generated
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
