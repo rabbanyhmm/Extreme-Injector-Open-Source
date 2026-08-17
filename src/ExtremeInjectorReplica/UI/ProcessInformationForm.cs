@@ -191,8 +191,8 @@ namespace ExtremeInjector.UI
             lstModules.SelectedIndexChanged += LstModules_SelectedIndexChanged;
             lstModules.ColumnClick += LstModules_ColumnClick;
             lstModules.DrawColumnHeader += LstModules_DrawColumnHeader;
-            lstModules.DrawItem += (s, e) => e.DrawDefault = true;
-            lstModules.DrawSubItem += (s, e) => e.DrawDefault = true;
+            lstModules.DrawItem += (s, e) => { };
+            lstModules.DrawSubItem += Lst_DrawSubItem;
 
             btnUnloadModule = new Button
             {
@@ -234,8 +234,8 @@ namespace ExtremeInjector.UI
             lstThreads.SelectedIndexChanged += LstThreads_SelectedIndexChanged;
             lstThreads.ColumnClick += LstThreads_ColumnClick;
             lstThreads.DrawColumnHeader += LstThreads_DrawColumnHeader;
-            lstThreads.DrawItem += (s, e) => e.DrawDefault = true;
-            lstThreads.DrawSubItem += (s, e) => e.DrawDefault = true;
+            lstThreads.DrawItem += (s, e) => { };
+            lstThreads.DrawSubItem += Lst_DrawSubItem;
 
             var pnlThreadButtons = new Panel
             {
@@ -483,6 +483,37 @@ namespace ExtremeInjector.UI
                     new Point(arrowX + 4, arrowY + 3)
                 };
                 g.FillPolygon(grayBrush, pts);
+            }
+        }
+
+        private void Lst_DrawSubItem(object? sender, DrawListViewSubItemEventArgs e)
+        {
+            if (e.Item == null) return;
+
+            bool isSelected = e.Item.Selected;
+            if (isSelected)
+            {
+                // Vivid Windows Blue Highlight
+                using var bgBrush = new SolidBrush(Color.FromArgb(0, 120, 215));
+                e.Graphics.FillRectangle(bgBrush, e.Bounds);
+
+                var textBounds = new Rectangle(e.Bounds.X + 4, e.Bounds.Y, e.Bounds.Width - 8, e.Bounds.Height);
+                TextRenderer.DrawText(e.Graphics, e.SubItem?.Text ?? "", e.Item.Font, textBounds, Color.White,
+                    TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+            }
+            else
+            {
+                using var bgBrush = new SolidBrush(Color.White);
+                e.Graphics.FillRectangle(bgBrush, e.Bounds);
+
+                // Subtle gridlines
+                using var gridPen = new Pen(Color.FromArgb(235, 235, 235));
+                e.Graphics.DrawLine(gridPen, e.Bounds.Left, e.Bounds.Bottom - 1, e.Bounds.Right, e.Bounds.Bottom - 1);
+                e.Graphics.DrawLine(gridPen, e.Bounds.Right - 1, e.Bounds.Top, e.Bounds.Right - 1, e.Bounds.Bottom);
+
+                var textBounds = new Rectangle(e.Bounds.X + 4, e.Bounds.Y, e.Bounds.Width - 8, e.Bounds.Height);
+                TextRenderer.DrawText(e.Graphics, e.SubItem?.Text ?? "", e.Item.Font, textBounds, Color.FromArgb(20, 20, 20),
+                    TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
             }
         }
 
