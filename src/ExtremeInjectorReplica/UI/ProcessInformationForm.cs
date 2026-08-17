@@ -34,11 +34,19 @@ namespace ExtremeInjector.UI
         private Button btnKillThread = null!;
         private Button btnSuspendThread = null!;
 
+        private Panel pnlBottomButtons = null!;
         private Button btnKillProcess = null!;
         private Button btnClose = null!;
-        private Panel pnlBottomButtons = null!;
 
         private readonly Dictionary<int, bool> _suspendedThreads = new();
+        private List<ModuleInfo> _cachedModules = new();
+        private List<ThreadInfo> _cachedThreads = new();
+
+        // Sort tracking
+        private int _modSortCol = 0;
+        private bool _modSortAsc = true;
+        private int _thSortCol = 0;
+        private bool _thSortAsc = true;
 
         public ProcessInformationForm(int processId, string processName, Image? processIcon = null)
         {
@@ -81,7 +89,7 @@ namespace ExtremeInjector.UI
             {
                 Text = "Process",
                 Location = new Point(12, 10),
-                Size = new Size(368, 128),
+                Size = new Size(385, 134),
                 Font = new Font("Segoe UI", 9f, FontStyle.Regular)
             };
 
@@ -96,8 +104,8 @@ namespace ExtremeInjector.UI
             lblProcessName = new Label
             {
                 Text = _processName,
-                Location = new Point(50, 20),
-                Size = new Size(306, 16),
+                Location = new Point(52, 20),
+                Size = new Size(323, 16),
                 Font = new Font("Segoe UI", 9f, FontStyle.Bold),
                 AutoEllipsis = true
             };
@@ -105,8 +113,8 @@ namespace ExtremeInjector.UI
             lblProcessPath = new Label
             {
                 Text = "Path: Loading...",
-                Location = new Point(50, 38),
-                Size = new Size(306, 32),
+                Location = new Point(52, 38),
+                Size = new Size(323, 32),
                 Font = new Font("Segoe UI", 8.25f),
                 ForeColor = Color.FromArgb(40, 40, 40),
                 AutoEllipsis = true
@@ -115,16 +123,16 @@ namespace ExtremeInjector.UI
             lblProcessId = new Label
             {
                 Text = $"Process ID: 0x{_processId:X} ({_processId})",
-                Location = new Point(50, 74),
-                Size = new Size(306, 16),
+                Location = new Point(52, 74),
+                Size = new Size(323, 16),
                 Font = new Font("Segoe UI", 9f)
             };
 
             lblModulesThreads = new Label
             {
                 Text = "Modules: 0  Threads: 0",
-                Location = new Point(50, 96),
-                Size = new Size(306, 16),
+                Location = new Point(52, 96),
+                Size = new Size(323, 16),
                 Font = new Font("Segoe UI", 9f)
             };
 
@@ -139,7 +147,7 @@ namespace ExtremeInjector.UI
             // 2. Tab Control
             tabControl = new TabControl
             {
-                Location = new Point(12, 146),
+                Location = new Point(12, 152),
                 Size = new Size(385, 280),
                 Font = new Font("Segoe UI", 9f)
             };
@@ -152,14 +160,14 @@ namespace ExtremeInjector.UI
             int tabTableWidth = 365;
             int tabTableHeight = 200; // ← Height of tables in BOTH tabs
 
-            int tabBtnY = 222;        // ← SHARED Y POSITION: Moves Unload Module, Kill, AND Suspend down TOGETHER!
-            int tabBtnHeight = 25;    // ← SHARED Button Height
+            int tabBtnY = 212;        // ← SHARED Y POSITION: Moves Unload Module, Kill, AND Suspend down TOGETHER!
+            int tabBtnHeight = 24;    // ← SHARED Button Height
 
             // -------------------------------------------------------------------------
             // TAB 1: MODULES
             // -------------------------------------------------------------------------
-            int unloadBtnWidth = 120; // ← Width of Unload Module button
-            int unloadBtnX = tabTableX + tabTableWidth - unloadBtnWidth; // Align right with table
+            int unloadBtnWidth = 120;
+            int unloadBtnX = tabTableX + tabTableWidth - unloadBtnWidth;
 
             tabModules = new TabPage { Text = "Modules", BackColor = Color.White };
             lstModules = new ListView
@@ -174,9 +182,10 @@ namespace ExtremeInjector.UI
                 HideSelection = false
             };
             lstModules.Columns.Add("Module Name", 145);
-            lstModules.Columns.Add("Module Base", 120);
-            lstModules.Columns.Add("Module Size", 90);
+            lstModules.Columns.Add("Module Base", 125);
+            lstModules.Columns.Add("Module Size", 80);
             lstModules.SelectedIndexChanged += LstModules_SelectedIndexChanged;
+            lstModules.ColumnClick += LstModules_ColumnClick;
 
             btnUnloadModule = new Button
             {
@@ -194,10 +203,10 @@ namespace ExtremeInjector.UI
             // -------------------------------------------------------------------------
             // TAB 2: THREADS
             // -------------------------------------------------------------------------
-            int thBtnWidth = 90;   // ← Width of both Kill and Suspend buttons
-            int thBtnSpacing = 10; // ← Spacing between Kill and Suspend
+            int thBtnWidth = 90;
+            int thBtnSpacing = 10;
             int thGroupWidth = (thBtnWidth * 2) + thBtnSpacing;
-            int thBtnGroupX = tabTableX + tabTableWidth - thGroupWidth; // Align right with table
+            int thBtnGroupX = tabTableX + tabTableWidth - thGroupWidth;
 
             tabThreads = new TabPage { Text = "Threads", BackColor = Color.White };
             lstThreads = new ListView
@@ -213,8 +222,9 @@ namespace ExtremeInjector.UI
             };
             lstThreads.Columns.Add("Thread ID", 85);
             lstThreads.Columns.Add("Start Address", 175);
-            lstThreads.Columns.Add("Priority", 95);
+            lstThreads.Columns.Add("Priority", 90);
             lstThreads.SelectedIndexChanged += LstThreads_SelectedIndexChanged;
+            lstThreads.ColumnClick += LstThreads_ColumnClick;
 
             var pnlThreadButtons = new Panel
             {
@@ -255,12 +265,12 @@ namespace ExtremeInjector.UI
             // 3. BOTTOM ACTION BUTTONS (KILL PROCESS / CLOSE)
             // =========================================================================
             int bottomBtnWidth = 105;   // ← Width of both buttons
-            int bottomBtnHeight = 20;   // ← Height of both buttons
+            int bottomBtnHeight = 24;   // ← Height of both buttons
             int bottomBtnSpacing = 8;   // ← Spacing between Kill Process and Close
 
             pnlBottomButtons = new Panel
             {
-                Location = new Point(164, 442), // ← ADJUST (X, Y) POSITION HERE (Increase Y to move down!)
+                Location = new Point(177, 438), // ← Position of bottom action buttons
                 Size = new Size((bottomBtnWidth * 2) + bottomBtnSpacing, bottomBtnHeight + 2),
                 BackColor = Color.Transparent
             };
@@ -301,12 +311,15 @@ namespace ExtremeInjector.UI
         {
             try
             {
-                var proc = Process.GetProcessById(_processId);
-                string path = proc.MainModule?.FileName ?? "";
+                string path = GetProcessFullPath(_processId);
                 if (!string.IsNullOrEmpty(path) && File.Exists(path))
                 {
                     using var ico = Icon.ExtractAssociatedIcon(path);
                     if (ico != null) picProcessIcon.Image = ico.ToBitmap();
+                }
+                else
+                {
+                    picProcessIcon.Image = SystemIcons.Application.ToBitmap();
                 }
             }
             catch
@@ -319,94 +332,144 @@ namespace ExtremeInjector.UI
         {
             try
             {
-                var proc = Process.GetProcessById(_processId);
-                string fullPath = "";
-                try
-                {
-                    fullPath = proc.MainModule?.FileName ?? "";
-                }
-                catch
-                {
-                    fullPath = GetProcessPathWin32(_processId);
-                }
-
+                string fullPath = GetProcessFullPath(_processId);
                 lblProcessPath.Text = string.IsNullOrEmpty(fullPath) ? _processName : fullPath;
 
-                // Load Modules
-                var modulesList = new List<ModuleInfo>();
-                try
-                {
-                    foreach (ProcessModule mod in proc.Modules)
-                    {
-                        modulesList.Add(new ModuleInfo
-                        {
-                            Name = mod.ModuleName,
-                            BaseAddress = mod.BaseAddress,
-                            Size = mod.ModuleMemorySize,
-                            Path = mod.FileName
-                        });
-                    }
-                }
-                catch
-                {
-                    modulesList = EnumerateModulesFallback(_processId);
-                }
+                // 1. Enumerate Modules using rock-solid Win32 PsApi & Toolhelp fallback
+                _cachedModules = EnumerateModulesNative(_processId);
 
-                lstModules.BeginUpdate();
-                lstModules.Items.Clear();
-                foreach (var mod in modulesList)
-                {
-                    var item = new ListViewItem(mod.Name);
-                    string baseAddrStr = IntPtr.Size == 8 
-                        ? $"0x{mod.BaseAddress.ToInt64():X12}" 
-                        : $"0x{mod.BaseAddress.ToInt64():X8}";
-                    item.SubItems.Add(baseAddrStr);
-                    item.SubItems.Add(FormatSize(mod.Size));
-                    item.Tag = mod;
-                    lstModules.Items.Add(item);
-                }
-                lstModules.EndUpdate();
+                // 2. Enumerate Threads
+                _cachedThreads = EnumerateThreadsNative(_processId, _cachedModules);
 
-                // Load Threads
-                var threadsList = new List<ThreadInfo>();
-                try
-                {
-                    foreach (ProcessThread th in proc.Threads)
-                    {
-                        string startAddr = ResolveAddress(th.StartAddress, modulesList);
-                        string priority = FormatPriority(th.PriorityLevel);
-                        threadsList.Add(new ThreadInfo
-                        {
-                            Id = th.Id,
-                            StartAddress = th.StartAddress,
-                            StartAddressString = startAddr,
-                            Priority = priority
-                        });
-                    }
-                }
-                catch
-                {
-                    threadsList = EnumerateThreadsFallback(_processId, modulesList);
-                }
+                lblModulesThreads.Text = $"Modules: {_cachedModules.Count}  Threads: {_cachedThreads.Count}";
 
-                lstThreads.BeginUpdate();
-                lstThreads.Items.Clear();
-                foreach (var th in threadsList)
-                {
-                    var item = new ListViewItem(th.Id.ToString());
-                    item.SubItems.Add(th.StartAddressString);
-                    item.SubItems.Add(th.Priority);
-                    item.Tag = th;
-                    lstThreads.Items.Add(item);
-                }
-                lstThreads.EndUpdate();
-
-                lblModulesThreads.Text = $"Modules: {modulesList.Count}  Threads: {threadsList.Count}";
+                RenderModulesList();
+                RenderThreadsList();
             }
             catch (Exception ex)
             {
                 MessageBox.Show($"Failed to inspect process: {ex.Message}", "Process Information", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
+        }
+
+        private void RenderModulesList()
+        {
+            var list = new List<ModuleInfo>(_cachedModules);
+
+            if (_modSortCol == 0) // Module Name
+            {
+                list = _modSortAsc
+                    ? list.OrderBy(m => m.Name, StringComparer.OrdinalIgnoreCase).ToList()
+                    : list.OrderByDescending(m => m.Name, StringComparer.OrdinalIgnoreCase).ToList();
+            }
+            else if (_modSortCol == 1) // Module Base
+            {
+                list = _modSortAsc
+                    ? list.OrderBy(m => m.BaseAddress.ToInt64()).ToList()
+                    : list.OrderByDescending(m => m.BaseAddress.ToInt64()).ToList();
+            }
+            else if (_modSortCol == 2) // Module Size
+            {
+                list = _modSortAsc
+                    ? list.OrderBy(m => m.Size).ToList()
+                    : list.OrderByDescending(m => m.Size).ToList();
+            }
+
+            // Update column headers with sort arrow
+            UpdateColumnHeaderSort(lstModules, _modSortCol, _modSortAsc, new[] { "Module Name", "Module Base", "Module Size" });
+
+            lstModules.BeginUpdate();
+            lstModules.Items.Clear();
+            foreach (var mod in list)
+            {
+                var item = new ListViewItem(mod.Name);
+                string baseAddrStr = $"0x{mod.BaseAddress.ToInt64():X}";
+                item.SubItems.Add(baseAddrStr);
+                item.SubItems.Add(FormatSize(mod.Size));
+                item.Tag = mod;
+                lstModules.Items.Add(item);
+            }
+            lstModules.EndUpdate();
+        }
+
+        private void RenderThreadsList()
+        {
+            var list = new List<ThreadInfo>(_cachedThreads);
+
+            if (_thSortCol == 0) // Thread ID
+            {
+                list = _thSortAsc ? list.OrderBy(t => t.Id).ToList() : list.OrderByDescending(t => t.Id).ToList();
+            }
+            else if (_thSortCol == 1) // Start Address
+            {
+                list = _thSortAsc
+                    ? list.OrderBy(t => t.StartAddressString, StringComparer.OrdinalIgnoreCase).ToList()
+                    : list.OrderByDescending(t => t.StartAddressString, StringComparer.OrdinalIgnoreCase).ToList();
+            }
+            else if (_thSortCol == 2) // Priority
+            {
+                list = _thSortAsc
+                    ? list.OrderBy(t => t.Priority, StringComparer.OrdinalIgnoreCase).ToList()
+                    : list.OrderByDescending(t => t.Priority, StringComparer.OrdinalIgnoreCase).ToList();
+            }
+
+            UpdateColumnHeaderSort(lstThreads, _thSortCol, _thSortAsc, new[] { "Thread ID", "Start Address", "Priority" });
+
+            lstThreads.BeginUpdate();
+            lstThreads.Items.Clear();
+            foreach (var th in list)
+            {
+                var item = new ListViewItem(th.Id.ToString());
+                item.SubItems.Add(th.StartAddressString);
+                item.SubItems.Add(th.Priority);
+                item.Tag = th;
+                lstThreads.Items.Add(item);
+            }
+            lstThreads.EndUpdate();
+        }
+
+        private static void UpdateColumnHeaderSort(ListView lv, int sortCol, bool sortAsc, string[] originalHeaders)
+        {
+            for (int i = 0; i < lv.Columns.Count; i++)
+            {
+                string baseTitle = originalHeaders[i];
+                if (i == sortCol)
+                {
+                    lv.Columns[i].Text = baseTitle + (sortAsc ? " ▲" : " ▼");
+                }
+                else
+                {
+                    lv.Columns[i].Text = baseTitle;
+                }
+            }
+        }
+
+        private void LstModules_ColumnClick(object? sender, ColumnClickEventArgs e)
+        {
+            if (_modSortCol == e.Column)
+            {
+                _modSortAsc = !_modSortAsc;
+            }
+            else
+            {
+                _modSortCol = e.Column;
+                _modSortAsc = true;
+            }
+            RenderModulesList();
+        }
+
+        private void LstThreads_ColumnClick(object? sender, ColumnClickEventArgs e)
+        {
+            if (_thSortCol == e.Column)
+            {
+                _thSortAsc = !_thSortAsc;
+            }
+            else
+            {
+                _thSortCol = e.Column;
+                _thSortAsc = true;
+            }
+            RenderThreadsList();
         }
 
         private static string FormatSize(int bytes)
@@ -446,7 +509,7 @@ namespace ExtremeInjector.UI
                 }
             }
 
-            return IntPtr.Size == 8 ? $"0x{addr:X12}" : $"0x{addr:X8}";
+            return $"0x{addr:X}";
         }
 
         private void LstModules_SelectedIndexChanged(object? sender, EventArgs e)
@@ -581,6 +644,99 @@ namespace ExtremeInjector.UI
             public string Priority { get; set; } = "Normal";
         }
 
+        private static List<ModuleInfo> EnumerateModulesNative(int pid)
+        {
+            var list = new List<ModuleInfo>();
+
+            // 1. Try PsApi EnumProcessModulesEx (Works for 32-bit & 64-bit processes)
+            IntPtr hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, false, pid);
+            if (hProcess != IntPtr.Zero)
+            {
+                try
+                {
+                    if (EnumProcessModulesEx(hProcess, null, 0, out uint needed, 0x03 /* LIST_MODULES_ALL */) && needed > 0)
+                    {
+                        int count = (int)(needed / IntPtr.Size);
+                        var hMods = new IntPtr[count];
+                        if (EnumProcessModulesEx(hProcess, hMods, needed, out _, 0x03))
+                        {
+                            var sbName = new StringBuilder(1024);
+                            var sbPath = new StringBuilder(1024);
+                            foreach (var hMod in hMods)
+                            {
+                                if (hMod == IntPtr.Zero) continue;
+                                sbName.Clear();
+                                sbPath.Clear();
+                                GetModuleBaseName(hProcess, hMod, sbName, (uint)sbName.Capacity);
+                                GetModuleFileNameEx(hProcess, hMod, sbPath, (uint)sbPath.Capacity);
+
+                                int modSize = 0;
+                                if (GetModuleInformation(hProcess, hMod, out MODULEINFO modInfo, (uint)Marshal.SizeOf<MODULEINFO>()))
+                                {
+                                    modSize = (int)modInfo.SizeOfImage;
+                                }
+
+                                string name = sbName.ToString();
+                                if (string.IsNullOrEmpty(name)) name = Path.GetFileName(sbPath.ToString());
+
+                                if (!string.IsNullOrEmpty(name))
+                                {
+                                    list.Add(new ModuleInfo
+                                    {
+                                        Name = name,
+                                        BaseAddress = hMod,
+                                        Size = modSize,
+                                        Path = sbPath.ToString()
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+                catch { }
+                finally
+                {
+                    CloseHandle(hProcess);
+                }
+            }
+
+            // 2. Fallback to Toolhelp32Snapshot if EnumProcessModulesEx returned nothing
+            if (list.Count == 0)
+            {
+                list = EnumerateModulesFallback(pid);
+            }
+
+            return list;
+        }
+
+        private static List<ThreadInfo> EnumerateThreadsNative(int pid, List<ModuleInfo> modules)
+        {
+            var list = new List<ThreadInfo>();
+
+            try
+            {
+                var proc = Process.GetProcessById(pid);
+                foreach (ProcessThread th in proc.Threads)
+                {
+                    string startAddr = ResolveAddress(th.StartAddress, modules);
+                    string priority = FormatPriority(th.PriorityLevel);
+                    list.Add(new ThreadInfo
+                    {
+                        Id = th.Id,
+                        StartAddress = th.StartAddress,
+                        StartAddressString = startAddr,
+                        Priority = priority
+                    });
+                }
+            }
+            catch
+            {
+                list = EnumerateThreadsFallback(pid, modules);
+            }
+
+            return list;
+        }
+
         private static bool UnloadRemoteModule(int pid, IntPtr moduleBase)
         {
             IntPtr hProcess = OpenProcess(PROCESS_CREATE_THREAD | PROCESS_QUERY_INFORMATION | PROCESS_VM_OPERATION | PROCESS_VM_WRITE | PROCESS_VM_READ, false, pid);
@@ -656,15 +812,21 @@ namespace ExtremeInjector.UI
             }
         }
 
-        private static string GetProcessPathWin32(int pid)
+        private static string GetProcessFullPath(int pid)
         {
-            IntPtr hProc = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid);
+            IntPtr hProc = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_QUERY_INFORMATION, false, pid);
             if (hProc == IntPtr.Zero) return "";
             try
             {
-                var sb = new StringBuilder(1024);
+                var sb = new StringBuilder(2048);
                 int size = sb.Capacity;
                 if (QueryFullProcessImageName(hProc, 0, sb, ref size))
+                {
+                    return sb.ToString();
+                }
+
+                sb.Clear();
+                if (GetModuleFileNameEx(hProc, IntPtr.Zero, sb, (uint)sb.Capacity) > 0)
                 {
                     return sb.ToString();
                 }
@@ -768,6 +930,14 @@ namespace ExtremeInjector.UI
             public uint dwFlags;
         }
 
+        [StructLayout(LayoutKind.Sequential)]
+        private struct MODULEINFO
+        {
+            public IntPtr lpBaseOfDll;
+            public uint SizeOfImage;
+            public IntPtr EntryPoint;
+        }
+
         private const uint PROCESS_CREATE_THREAD = 0x0002;
         private const uint PROCESS_VM_OPERATION = 0x0008;
         private const uint PROCESS_VM_READ = 0x0010;
@@ -822,6 +992,18 @@ namespace ExtremeInjector.UI
 
         [DllImport("kernel32.dll")]
         private static extern bool Thread32Next(IntPtr hSnapshot, ref THREADENTRY32 lpte);
+
+        [DllImport("psapi.dll", SetLastError = true)]
+        private static extern bool EnumProcessModulesEx(IntPtr hProcess, [Out] IntPtr[]? lphModule, uint cb, out uint lpcbNeeded, uint dwFilterFlag);
+
+        [DllImport("psapi.dll", SetLastError = true, CharSet = CharSet.Auto)]
+        private static extern uint GetModuleFileNameEx(IntPtr hProcess, IntPtr hModule, [Out] StringBuilder lpFilename, uint nSize);
+
+        [DllImport("psapi.dll", SetLastError = true, CharSet = CharSet.Auto)]
+        private static extern uint GetModuleBaseName(IntPtr hProcess, IntPtr hModule, [Out] StringBuilder lpBaseName, uint nSize);
+
+        [DllImport("psapi.dll", SetLastError = true)]
+        private static extern bool GetModuleInformation(IntPtr hProcess, IntPtr hModule, out MODULEINFO lpmodinfo, uint cb);
 
         #endregion
     }
