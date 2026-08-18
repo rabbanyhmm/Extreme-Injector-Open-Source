@@ -19,19 +19,19 @@
     <HideModule>false</HideModule>
     <Method>0</Method>
     <Scramble>
-      <CreateFakeDebugDirectory>true</CreateFakeDebugDirectory>
-      <CreateNewEntryPoint>true</CreateNewEntryPoint>
-      <InsertExtraSections>true</InsertExtraSections>
-      <ModifyAssemblyCode>true</ModifyAssemblyCode>
-      <ModifyImportTable>true</ModifyImportTable>
-      <MoveRelocationTable>true</MoveRelocationTable>
-      <RemoveDebugData>true</RemoveDebugData>
-      <RemoveUselessData>true</RemoveUselessData>
-      <RenameSections>true</RenameSections>
-      <ScrambleHeaderFields>true</ScrambleHeaderFields>
-      <ShiftSectionData>true</ShiftSectionData>
-      <ShiftSectionMemory>true</ShiftSectionMemory>
-      <StripSectionCharacteristics>true</StripSectionCharacteristics>
+      <CreateFakeDebugDirectory>false</CreateFakeDebugDirectory>
+      <CreateNewEntryPoint>false</CreateNewEntryPoint>
+      <InsertExtraSections>false</InsertExtraSections>
+      <ModifyAssemblyCode>false</ModifyAssemblyCode>
+      <ModifyImportTable>false</ModifyImportTable>
+      <MoveRelocationTable>false</MoveRelocationTable>
+      <RemoveDebugData>false</RemoveDebugData>
+      <RemoveUselessData>false</RemoveUselessData>
+      <RenameSections>false</RenameSections>
+      <ScrambleHeaderFields>false</ScrambleHeaderFields>
+      <ShiftSectionData>false</ShiftSectionData>
+      <ShiftSectionMemory>false</ShiftSectionMemory>
+      <StripSectionCharacteristics>false</StripSectionCharacteristics>
     </Scramble>
     <StealthInject>false</StealthInject>
     <TextColor>White</TextColor>

@@ -254,7 +254,8 @@ namespace ExtremeInjector.UI
                 Location = new Point(10, 18),
                 Size = new Size(160, 24),
                 FlatStyle = FlatStyle.System,
-                UseVisualStyleBackColor = true
+                UseVisualStyleBackColor = true,
+                Enabled = !string.IsNullOrWhiteSpace(SettingsManager.Current.ProcessName)
             };
             btnViewProcessInfo.Click += BtnViewProcessInfo_Click;
 
@@ -520,16 +521,15 @@ namespace ExtremeInjector.UI
         private void BtnViewProcessInfo_Click(object? sender, EventArgs e)
         {
             string pName = SettingsManager.Current.ProcessName;
+            if (string.IsNullOrWhiteSpace(pName)) return;
+
             int pid = 0;
-            if (!string.IsNullOrEmpty(pName))
+            try
             {
-                try
-                {
-                    var procs = Process.GetProcessesByName(Path.GetFileNameWithoutExtension(pName));
-                    if (procs.Length > 0) pid = procs[0].Id;
-                }
-                catch { }
+                var procs = Process.GetProcessesByName(Path.GetFileNameWithoutExtension(pName));
+                if (procs.Length > 0) pid = procs[0].Id;
             }
+            catch { }
 
             if (pid > 0)
             {
@@ -538,12 +538,7 @@ namespace ExtremeInjector.UI
             }
             else
             {
-                using var dlg = new ProcessSelectForm();
-                if (dlg.ShowDialog(this) == DialogResult.OK)
-                {
-                    using var infoDlg = new ProcessInformationForm(dlg.SelectedProcessId, dlg.SelectedProcessName);
-                    infoDlg.ShowDialog(this);
-                }
+                MessageBox.Show($"Selected process '{pName}' is not currently running.", "Process Information", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
         }
 
@@ -570,6 +565,8 @@ namespace ExtremeInjector.UI
             cmbMethod.SelectedIndex = Math.Max(0, Math.Min(opt.Method, 4));
 
             UpdateScramblePresetFromConfig();
+
+            btnViewProcessInfo.Enabled = !string.IsNullOrWhiteSpace(SettingsManager.Current.ProcessName);
 
             chkAutoInject.Checked = opt.AutoInject;
             chkCloseOnInject.Checked = opt.CloseOnInject;
