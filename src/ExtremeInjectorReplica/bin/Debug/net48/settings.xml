@@ -1,12 +1,7 @@
 <?xml version="1.0"?>
 <Settings xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <LastUpdateCheck>2026-08-18T03:06:09.6605607Z</LastUpdateCheck>
-  <Modules>
-    <Module>
-      <Enable>true</Enable>
-      <Path>C:\Users\mdrab\Downloads\ChamsMenu (1).dll</Path>
-    </Module>
-  </Modules>
+  <Modules />
   <Options>
     <Advanced>
       <DisableExceptionSupport>false</DisableExceptionSupport>
@@ -15,8 +10,8 @@
       <ManualResolveImports>false</ManualResolveImports>
     </Advanced>
     <AutoInject>false</AutoInject>
-    <Background1>#828EFD</Background1>
-    <Background2>#0006FF</Background2>
+    <Background1>DodgerBlue</Background1>
+    <Background2>DeepSkyBlue</Background2>
     <CloseOnInject>false</CloseOnInject>
     <Delay>0</Delay>
     <DelayBetween>0</DelayBetween>
