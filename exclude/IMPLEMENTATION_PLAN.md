@@ -20,10 +20,43 @@ Extreme Injector v3.exe  (single file)
 │
 ├── Config Layer                          Settings.cs, SettingsManager (XML)
 │
+├── Security / Privileges                    PrivilegeManager.cs (SeDebugPrivilege, Token Elevation)
+│
 └── Win32 / NTAPI                         NativeMethods.cs (kernel32, ntdll, psapi, user32)
 ```
 
 **Key rule:** All injectors run inside the C# process. No DLL is dropped to disk. No child process is launched. Everything goes through `VirtualAllocEx` / `WriteProcessMemory` / shellcode stubs or NTAPI in the remote process.
+
+---
+
+## Dynamic Privilege Adaptation Architecture (Process Hacker Style)
+
+```
+                     ┌───────────────────────────────────────────────┐
+                     │          Application Launch                   │
+                     └───────────────────────┬───────────────────────┘
+                                             │
+                       Enable SeDebugPrivilege (RtlAdjustPrivilege)
+                                             │
+               ┌─────────────────────────────┼─────────────────────────────┐
+               ▼                             ▼                             ▼
+       Standard User Mode              Admin Privilege Mode           SYSTEM Privilege Mode
+  (Non-Elevated Account)             (Elevated Administrator)      (NT AUTHORITY\SYSTEM)
+ ─────────────────────────────     ───────────────────────────   ─────────────────────────────
+ • Uses QUERY_LIMITED_INFO         • Access to all user & admin  • Full access to protected &
+ • Enumerates all visible procs      processes                     system processes (LSASS, etc)
+ • Queries modules & threads via   • Enables injection & module  • Maximum level operations
+   Toolhelp32 snapshots              unloading across all users
+ • Graceful fallback UI
+```
+
+### Multi-Tier Process Access Opening Cascade:
+When opening a process handle for information, enumeration, module unloading, or injection, the engine uses a 4-level cascading fallback mechanism:
+
+1. **Tier 1 (Maximum Access)**: `PROCESS_ALL_ACCESS` (`0x1F0FFF`)
+2. **Tier 2 (Injection Access)**: `PROCESS_CREATE_THREAD | PROCESS_VM_OPERATION | PROCESS_VM_WRITE | PROCESS_VM_READ | PROCESS_QUERY_INFORMATION` (`0x043A`)
+3. **Tier 3 (Limited Info Access)**: `PROCESS_QUERY_INFORMATION | PROCESS_VM_READ` (`0x0410`)
+4. **Tier 4 (Minimum Query Access)**: `PROCESS_QUERY_LIMITED_INFORMATION` (`0x1000`)
 
 ---
 
