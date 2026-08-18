@@ -1,0 +1,16 @@
+C:\Users\mdrab\Documents\Perfect replica of Extreme injector\src\ExtremeInjectorReplica\obj\Debug\net9.0-windows\ExtremeInjectorReplica.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\mdrab\Documents\Perfect replica of Extreme injector\src\ExtremeInjectorReplica\obj\Debug\net9.0-windows\ExtremeInjectorReplica.AssemblyInfoInputs.cache
+C:\Users\mdrab\Documents\Perfect replica of Extreme injector\src\ExtremeInjectorReplica\obj\Debug\net9.0-windows\ExtremeInjectorReplica.AssemblyInfo.cs
+C:\Users\mdrab\Documents\Perfect replica of Extreme injector\src\ExtremeInjectorReplica\obj\Debug\net9.0-windows\ExtremeInjectorReplica.csproj.CoreCompileInputs.cache
+C:\Users\mdrab\Documents\Perfect replica of Extreme injector\src\ExtremeInjectorReplica\bin\Debug\net9.0-windows\Extreme Injector v3.exe
+C:\Users\mdrab\Documents\Perfect replica of Extreme injector\src\ExtremeInjectorReplica\bin\Debug\net9.0-windows\Extreme Injector v3.deps.json
+C:\Users\mdrab\Documents\Perfect replica of Extreme injector\src\ExtremeInjectorReplica\bin\Debug\net9.0-windows\Extreme Injector v3.runtimeconfig.json
+C:\Users\mdrab\Documents\Perfect replica of Extreme injector\src\ExtremeInjectorReplica\bin\Debug\net9.0-windows\Extreme Injector v3.dll
+C:\Users\mdrab\Documents\Perfect replica of Extreme injector\src\ExtremeInjectorReplica\bin\Debug\net9.0-windows\Extreme Injector v3.pdb
+C:\Users\mdrab\Documents\Perfect replica of Extreme injector\src\ExtremeInjectorReplica\obj\Debug\net9.0-windows\Extreme Injector v3.dll
+C:\Users\mdrab\Documents\Perfect replica of Extreme injector\src\ExtremeInjectorReplica\obj\Debug\net9.0-windows\refint\Extreme Injector v3.dll
+C:\Users\mdrab\Documents\Perfect replica of Extreme injector\src\ExtremeInjectorReplica\obj\Debug\net9.0-windows\Extreme Injector v3.pdb
+C:\Users\mdrab\Documents\Perfect replica of Extreme injector\src\ExtremeInjectorReplica\obj\Debug\net9.0-windows\ExtremeInjectorReplica.genruntimeconfig.cache
+C:\Users\mdrab\Documents\Perfect replica of Extreme injector\src\ExtremeInjectorReplica\obj\Debug\net9.0-windows\ref\Extreme Injector v3.dll
+C:\Users\mdrab\Documents\Perfect replica of Extreme injector\src\ExtremeInjectorReplica\bin\Debug\net9.0-windows\ExtremeInjector.ico
+C:\Users\mdrab\Documents\Perfect replica of Extreme injector\src\ExtremeInjectorReplica\obj\Debug\net9.0-windows\ExtremeInjectorReplica.sourcelink.json

@@ -858,7 +858,7 @@ namespace ExtremeInjector.UI
             }
             else
             {
-                MessageBox.Show($"Injection finished with errors:\n\n{result.ErrorMessage}", "Injection Failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"An injection error occurred:\n\n{result.ErrorMessage.Trim()}", "Extreme Injector", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 

@@ -53,7 +53,7 @@ Extreme Injector v3.exe  (single file)
 | 18 | Module column sort (click header) | ✅ Done | |
 | 19 | Thread column sort (click header) | ✅ Done | |
 | **INJECTION METHODS** | | | |
-| 22 | **Standard Inject** (LoadLibraryW via CRT) | ✅ Done | `VirtualAllocEx` + `WriteProcessMemory` + `CreateRemoteThread` → `LoadLibraryW` |
+| 22 | **Standard Inject** (LoadLibraryW via CRT) | ✅ Done | PE architecture validation, `VirtualAllocEx` + `WriteProcessMemory` + `CreateRemoteThread` → `LoadLibraryW`, thread exit code verification (`GetExitCodeThread`), `VirtualFreeEx` cleanup, exact Win32 error formatting, and Extreme Injector error popup |
 | 23 | **LdrLoadDll Inject** | ❌ Not Done | Allocate UNICODE_STRING + path in remote, `CreateRemoteThread` → `LdrLoadDll` from ntdll |
 | 24 | **Thread Hijacking Inject** | ❌ Not Done | Snapshot threads, pick one, `SuspendThread`, `GetThreadContext`, write shellcode at `RIP`/`EIP`, `SetThreadContext`, `ResumeThread` |
 | 25 | **Manual Map Inject** | ❌ Not Done | Parse PE, allocate in remote, fix relocations, resolve imports, write shellcode to call DllMain |

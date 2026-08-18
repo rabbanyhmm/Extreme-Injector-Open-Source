@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -10,60 +11,233 @@ namespace ExtremeInjector.Core
         public static bool Inject(int processId, string dllPath, out string errorMessage)
         {
             errorMessage = "";
+            IntPtr hProcess = IntPtr.Zero;
+            IntPtr remoteMem = IntPtr.Zero;
+            IntPtr hThread = IntPtr.Zero;
+
             if (!File.Exists(dllPath))
             {
                 errorMessage = $"DLL file does not exist: {dllPath}";
                 return false;
             }
 
-            IntPtr hProcess = NativeMethods.OpenProcess(NativeMethods.PROCESS_ALL_ACCESS, false, processId);
+            // 1. Architecture Check (PE Machine Header vs Target Process Architecture)
+            if (!ValidateArchitecture(processId, dllPath, out string archError))
+            {
+                errorMessage = archError;
+                return false;
+            }
+
+            // 2. Open Target Process with Lowest Level Access Flags
+            const uint PROCESS_ACCESS = NativeMethods.PROCESS_CREATE_THREAD |
+                                         NativeMethods.THREAD_QUERY_INFORMATION |
+                                         NativeMethods.PROCESS_VM_OPERATION |
+                                         NativeMethods.PROCESS_VM_WRITE |
+                                         NativeMethods.PROCESS_VM_READ;
+
+            hProcess = NativeMethods.OpenProcess(PROCESS_ACCESS, false, processId);
             if (hProcess == IntPtr.Zero)
             {
-                errorMessage = $"Failed to open target process (PID: {processId}). Error: {Marshal.GetLastWin32Error()}";
+                int err = Marshal.GetLastWin32Error();
+                errorMessage = $"Failed to open target process (PID: {processId}).\nWin32 Error {err}: {GetWin32ErrorMessage(err)}";
                 return false;
             }
 
             try
             {
+                // 3. Prepare Unicode DLL Path Buffer
                 byte[] pathBytes = Encoding.Unicode.GetBytes(dllPath + "\0");
                 UIntPtr size = (UIntPtr)pathBytes.Length;
 
-                IntPtr remoteMem = NativeMethods.VirtualAllocEx(hProcess, IntPtr.Zero, size, NativeMethods.MEM_COMMIT | NativeMethods.MEM_RESERVE, NativeMethods.PAGE_READWRITE);
+                // 4. Allocate Memory in Remote Process
+                remoteMem = NativeMethods.VirtualAllocEx(
+                    hProcess,
+                    IntPtr.Zero,
+                    size,
+                    NativeMethods.MEM_COMMIT | NativeMethods.MEM_RESERVE,
+                    NativeMethods.PAGE_READWRITE
+                );
+
                 if (remoteMem == IntPtr.Zero)
                 {
-                    errorMessage = $"Failed to allocate memory in target process. Error: {Marshal.GetLastWin32Error()}";
+                    int err = Marshal.GetLastWin32Error();
+                    errorMessage = $"Failed to allocate {size} bytes in target process.\nWin32 Error {err}: {GetWin32ErrorMessage(err)}";
                     return false;
                 }
 
+                // 5. Write DLL Path String to Allocated Memory
                 if (!NativeMethods.WriteProcessMemory(hProcess, remoteMem, pathBytes, size, out _))
                 {
-                    errorMessage = $"Failed to write DLL path to target process. Error: {Marshal.GetLastWin32Error()}";
+                    int err = Marshal.GetLastWin32Error();
+                    errorMessage = $"Failed to write DLL path into target process memory.\nWin32 Error {err}: {GetWin32ErrorMessage(err)}";
                     return false;
                 }
 
+                // 6. Resolve LoadLibraryW Address
                 IntPtr hKernel32 = NativeMethods.GetModuleHandle("kernel32.dll");
+                if (hKernel32 == IntPtr.Zero)
+                {
+                    int err = Marshal.GetLastWin32Error();
+                    errorMessage = $"Failed to get handle for kernel32.dll.\nWin32 Error {err}: {GetWin32ErrorMessage(err)}";
+                    return false;
+                }
+
                 IntPtr loadLibraryAddr = NativeMethods.GetProcAddress(hKernel32, "LoadLibraryW");
                 if (loadLibraryAddr == IntPtr.Zero)
                 {
-                    errorMessage = "Failed to resolve LoadLibraryW address.";
+                    int err = Marshal.GetLastWin32Error();
+                    errorMessage = $"Failed to resolve LoadLibraryW export address in kernel32.dll.\nWin32 Error {err}: {GetWin32ErrorMessage(err)}";
                     return false;
                 }
 
-                IntPtr hThread = NativeMethods.CreateRemoteThread(hProcess, IntPtr.Zero, UIntPtr.Zero, loadLibraryAddr, remoteMem, 0, out uint threadId);
+                // 7. Create Remote Thread to Execute LoadLibraryW
+                hThread = NativeMethods.CreateRemoteThread(
+                    hProcess,
+                    IntPtr.Zero,
+                    UIntPtr.Zero,
+                    loadLibraryAddr,
+                    remoteMem,
+                    0,
+                    out uint threadId
+                );
+
                 if (hThread == IntPtr.Zero)
                 {
-                    errorMessage = $"CreateRemoteThread failed. Error: {Marshal.GetLastWin32Error()}";
+                    int err = Marshal.GetLastWin32Error();
+                    errorMessage = $"CreateRemoteThread failed.\nWin32 Error {err}: {GetWin32ErrorMessage(err)}";
                     return false;
                 }
 
-                NativeMethods.WaitForSingleObject(hThread, 5000);
-                NativeMethods.CloseHandle(hThread);
+                // 8. Wait for Thread Execution
+                uint waitResult = NativeMethods.WaitForSingleObject(hThread, 10000); // 10 sec timeout
+                if (waitResult == 0x00000102 /* WAIT_TIMEOUT */)
+                {
+                    errorMessage = "Remote thread execution timed out after 10 seconds.";
+                    return false;
+                }
+
+                // 9. Inspect Remote Thread Exit Code (LoadLibraryW return value = HMODULE)
+                if (NativeMethods.GetExitCodeThread(hThread, out uint exitCode))
+                {
+                    if (exitCode == 0)
+                    {
+                        errorMessage = $"LoadLibraryW returned NULL (0x0) in target process.\nThe DLL failed to initialize (DllMain returned FALSE) or is missing required dependencies.";
+                        return false;
+                    }
+                }
 
                 return true;
             }
+            catch (Exception ex)
+            {
+                errorMessage = $"Unexpected injection failure: {ex.Message}";
+                return false;
+            }
             finally
             {
-                NativeMethods.CloseHandle(hProcess);
+                // 10. Clean Up Handles and Allocated Memory
+                if (hThread != IntPtr.Zero)
+                    NativeMethods.CloseHandle(hThread);
+
+                if (remoteMem != IntPtr.Zero && hProcess != IntPtr.Zero)
+                    NativeMethods.VirtualFreeEx(hProcess, remoteMem, UIntPtr.Zero, NativeMethods.MEM_RELEASE);
+
+                if (hProcess != IntPtr.Zero)
+                    NativeMethods.CloseHandle(hProcess);
+            }
+        }
+
+        private static bool ValidateArchitecture(int processId, string dllPath, out string error)
+        {
+            error = "";
+            try
+            {
+                // Determine target process bitness
+                IntPtr hProcess = NativeMethods.OpenProcess(0x1000 /* PROCESS_QUERY_LIMITED_INFORMATION */, false, processId);
+                if (hProcess == IntPtr.Zero)
+                {
+                    hProcess = NativeMethods.OpenProcess(NativeMethods.PROCESS_QUERY_INFORMATION, false, processId);
+                }
+
+                bool isTarget64 = false;
+                if (hProcess != IntPtr.Zero)
+                {
+                    try
+                    {
+                        if (Environment.Is64BitOperatingSystem)
+                        {
+                            if (NativeMethods.IsWow64Process(hProcess, out bool isWow64))
+                            {
+                                isTarget64 = !isWow64;
+                            }
+                            else
+                            {
+                                isTarget64 = Environment.Is64BitProcess;
+                            }
+                        }
+                        else
+                        {
+                            isTarget64 = false;
+                        }
+                    }
+                    finally
+                    {
+                        NativeMethods.CloseHandle(hProcess);
+                    }
+                }
+
+                // Determine DLL bitness from PE header
+                ushort machine = GetDllMachineType(dllPath);
+                bool isDll64 = (machine == 0x8664 /* IMAGE_FILE_MACHINE_AMD64 */);
+                bool isDll32 = (machine == 0x014C /* IMAGE_FILE_MACHINE_I386 */);
+
+                if (isTarget64 && isDll32)
+                {
+                    error = $"Architecture Mismatch: Target process is 64-bit, but DLL '{Path.GetFileName(dllPath)}' is 32-bit (x86).";
+                    return false;
+                }
+                if (!isTarget64 && isDll64)
+                {
+                    error = $"Architecture Mismatch: Target process is 32-bit, but DLL '{Path.GetFileName(dllPath)}' is 64-bit (x64).";
+                    return false;
+                }
+            }
+            catch { }
+
+            return true;
+        }
+
+        private static ushort GetDllMachineType(string filePath)
+        {
+            try
+            {
+                using var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                using var br = new BinaryReader(fs);
+
+                if (br.ReadUInt16() != 0x5A4D) return 0; // 'MZ'
+                fs.Seek(0x3C, SeekOrigin.Begin);
+                uint e_lfanew = br.ReadUInt32();
+
+                fs.Seek(e_lfanew, SeekOrigin.Begin);
+                if (br.ReadUInt32() != 0x00004550) return 0; // 'PE\0\0'
+
+                return br.ReadUInt16(); // Machine header
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
+        private static string GetWin32ErrorMessage(int errorCode)
+        {
+            try
+            {
+                return new Win32Exception(errorCode).Message;
+            }
+            catch
+            {
+                return "Unknown Win32 Error";
             }
         }
     }
