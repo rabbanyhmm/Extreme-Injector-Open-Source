@@ -54,19 +54,19 @@ namespace ExtremeInjector.Config
 
     public class ScrambleConfig
     {
-        public bool CreateFakeDebugDirectory { get; set; } = false;
-        public bool CreateNewEntryPoint { get; set; } = false;
-        public bool InsertExtraSections { get; set; } = false;
-        public bool ModifyAssemblyCode { get; set; } = false;
-        public bool ModifyImportTable { get; set; } = false;
-        public bool MoveRelocationTable { get; set; } = false;
-        public bool RemoveDebugData { get; set; } = false;
-        public bool RemoveUselessData { get; set; } = false;
-        public bool RenameSections { get; set; } = false;
-        public bool ScrambleHeaderFields { get; set; } = false;
-        public bool ShiftSectionData { get; set; } = false;
-        public bool ShiftSectionMemory { get; set; } = false;
-        public bool StripSectionCharacteristics { get; set; } = false;
+        public bool CreateFakeDebugDirectory { get; set; } = true;
+        public bool CreateNewEntryPoint { get; set; } = true;
+        public bool InsertExtraSections { get; set; } = true;
+        public bool ModifyAssemblyCode { get; set; } = true;
+        public bool ModifyImportTable { get; set; } = true;
+        public bool MoveRelocationTable { get; set; } = true;
+        public bool RemoveDebugData { get; set; } = true;
+        public bool RemoveUselessData { get; set; } = true;
+        public bool RenameSections { get; set; } = true;
+        public bool ScrambleHeaderFields { get; set; } = true;
+        public bool ShiftSectionData { get; set; } = true;
+        public bool ShiftSectionMemory { get; set; } = true;
+        public bool StripSectionCharacteristics { get; set; } = true;
     }
 
     public class WarningConfig
