@@ -48,20 +48,11 @@ namespace ExtremeInjector.Core
 
             try
             {
-                // 3. Resolve ntdll!LdrLoadDll Export Address
-                IntPtr hNtdll = NativeMethods.GetModuleHandle("ntdll.dll");
-                if (hNtdll == IntPtr.Zero)
-                {
-                    int err = Marshal.GetLastWin32Error();
-                    errorMessage = $"Failed to get module handle for ntdll.dll.\nWin32 Error {err}: {new Win32Exception(err).Message}";
-                    return false;
-                }
-
-                IntPtr pLdrLoadDll = NativeMethods.GetProcAddress(hNtdll, "LdrLoadDll");
+                // 3. Resolve ntdll!LdrLoadDll Export Address (Supports native x64 and WoW64 x86)
+                IntPtr pLdrLoadDll = RemoteExportResolver.GetProcAddress(processId, isTarget64, "ntdll.dll", "LdrLoadDll");
                 if (pLdrLoadDll == IntPtr.Zero)
                 {
-                    int err = Marshal.GetLastWin32Error();
-                    errorMessage = $"Failed to resolve ntdll!LdrLoadDll export.\nWin32 Error {err}: {new Win32Exception(err).Message}";
+                    errorMessage = "Failed to resolve ntdll!LdrLoadDll export in target process.";
                     return false;
                 }
 

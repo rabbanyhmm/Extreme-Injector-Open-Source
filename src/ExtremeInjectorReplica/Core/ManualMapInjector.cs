@@ -132,17 +132,16 @@ namespace ExtremeInjector.Core
                     return false;
                 }
 
-                // 8. Resolve Host API Addresses
-                IntPtr hKernel32 = NativeMethods.GetModuleHandle("kernel32.dll");
-                IntPtr pLoadLibraryA = NativeMethods.GetProcAddress(hKernel32, "LoadLibraryA");
-                IntPtr pGetProcAddress = NativeMethods.GetProcAddress(hKernel32, "GetProcAddress");
-
-                IntPtr hNtdll = NativeMethods.GetModuleHandle("ntdll.dll");
-                IntPtr pRtlAddFunctionTable = NativeMethods.GetProcAddress(hNtdll, "RtlAddFunctionTable");
+                // 8. Resolve Target Process API Addresses (Supports native x64 and WoW64 x86)
+                IntPtr pLoadLibraryA = RemoteExportResolver.GetProcAddress(processId, isTarget64, "kernel32.dll", "LoadLibraryA");
+                IntPtr pGetProcAddress = RemoteExportResolver.GetProcAddress(processId, isTarget64, "kernel32.dll", "GetProcAddress");
+                IntPtr pRtlAddFunctionTable = isTarget64
+                    ? RemoteExportResolver.GetProcAddress(processId, isTarget64, "ntdll.dll", "RtlAddFunctionTable")
+                    : IntPtr.Zero;
 
                 if (pLoadLibraryA == IntPtr.Zero || pGetProcAddress == IntPtr.Zero)
                 {
-                    errorMessage = "Failed to resolve required loader APIs (LoadLibraryA / GetProcAddress).";
+                    errorMessage = "Failed to resolve required loader APIs (LoadLibraryA / GetProcAddress) in target process.";
                     return false;
                 }
 

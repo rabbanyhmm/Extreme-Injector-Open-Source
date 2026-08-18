@@ -24,7 +24,7 @@ namespace ExtremeInjector.Core
             }
 
             // 1. Architecture Check (PE Machine Header vs Target Process Architecture)
-            if (!ValidateArchitecture(processId, dllPath, out string archError))
+            if (!ValidateArchitecture(processId, dllPath, out bool isTarget64, out string archError))
             {
                 errorMessage = archError;
                 return false;
@@ -75,20 +75,11 @@ namespace ExtremeInjector.Core
                     return false;
                 }
 
-                // 6. Resolve LoadLibraryW Address
-                IntPtr hKernel32 = NativeMethods.GetModuleHandle("kernel32.dll");
-                if (hKernel32 == IntPtr.Zero)
-                {
-                    int err = Marshal.GetLastWin32Error();
-                    errorMessage = $"Failed to get handle for kernel32.dll.\nWin32 Error {err}: {GetWin32ErrorMessage(err)}";
-                    return false;
-                }
-
-                IntPtr loadLibraryAddr = NativeMethods.GetProcAddress(hKernel32, "LoadLibraryW");
+                // 6. Resolve LoadLibraryW Address (Supports native x64 and WoW64 x86)
+                IntPtr loadLibraryAddr = RemoteExportResolver.GetProcAddress(processId, isTarget64, "kernel32.dll", "LoadLibraryW");
                 if (loadLibraryAddr == IntPtr.Zero)
                 {
-                    int err = Marshal.GetLastWin32Error();
-                    errorMessage = $"Failed to resolve LoadLibraryW export address in kernel32.dll.\nWin32 Error {err}: {GetWin32ErrorMessage(err)}";
+                    errorMessage = "Failed to resolve LoadLibraryW export address in target process kernel32.dll.";
                     return false;
                 }
 
@@ -149,8 +140,9 @@ namespace ExtremeInjector.Core
             }
         }
 
-        private static bool ValidateArchitecture(int processId, string dllPath, out string error)
+        private static bool ValidateArchitecture(int processId, string dllPath, out bool isTarget64, out string error)
         {
+            isTarget64 = false;
             error = "";
             try
             {
@@ -160,8 +152,6 @@ namespace ExtremeInjector.Core
                 {
                     hProcess = NativeMethods.OpenProcess(NativeMethods.PROCESS_QUERY_INFORMATION, false, processId);
                 }
-
-                bool isTarget64 = false;
                 if (hProcess != IntPtr.Zero)
                 {
                     try
