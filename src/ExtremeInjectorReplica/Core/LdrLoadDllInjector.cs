@@ -16,6 +16,7 @@ namespace ExtremeInjector.Core
             IntPtr hProcess = IntPtr.Zero;
             IntPtr remoteMem = IntPtr.Zero;
             IntPtr hThread = IntPtr.Zero;
+            bool shouldFreeMem = true;
 
             if (!File.Exists(dllPath))
             {
@@ -218,7 +219,8 @@ namespace ExtremeInjector.Core
                 uint waitResult = NativeMethods.WaitForSingleObject(hThread, 10000);
                 if (waitResult == 0x00000102 /* WAIT_TIMEOUT */)
                 {
-                    errorMessage = "Remote LdrLoadDll thread timed out after 10 seconds.";
+                    shouldFreeMem = false; // Do NOT unmap memory under a still-running thread
+                    errorMessage = "Remote LdrLoadDll thread timed out after 10 seconds. DllMain may still be initializing.";
                     return false;
                 }
 
@@ -256,7 +258,7 @@ namespace ExtremeInjector.Core
                 if (hThread != IntPtr.Zero)
                     NativeMethods.CloseHandle(hThread);
 
-                if (remoteMem != IntPtr.Zero && hProcess != IntPtr.Zero)
+                if (shouldFreeMem && remoteMem != IntPtr.Zero && hProcess != IntPtr.Zero)
                     NativeMethods.VirtualFreeEx(hProcess, remoteMem, UIntPtr.Zero, NativeMethods.MEM_RELEASE);
 
                 if (hProcess != IntPtr.Zero)

@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("rabbanyhmm")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+ce4b93157a26e05824f184b12caf23fa191ee1fa")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+0e3bf76e4e29432fa3aa80cf3caac13f5e0276ad")]
 [assembly: System.Reflection.AssemblyProductAttribute("Extreme Injector")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Extreme Injector v3")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
