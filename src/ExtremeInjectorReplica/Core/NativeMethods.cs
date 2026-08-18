@@ -156,5 +156,16 @@ namespace ExtremeInjector.Core
 
         [DllImport("ntdll.dll", SetLastError = true)]
         public static extern void RtlInitUnicodeString(ref UNICODE_STRING DestinationString, [MarshalAs(UnmanagedType.LPWStr)] string SourceString);
+
+        public const uint ThreadQuerySetWin32StartAddress = 9;
+
+        [DllImport("ntdll.dll", SetLastError = true)]
+        public static extern int NtQueryInformationThread(
+            IntPtr threadHandle,
+            uint threadInformationClass,
+            out IntPtr threadInformation,
+            uint threadInformationLength,
+            out uint returnLength
+        );
     }
 }

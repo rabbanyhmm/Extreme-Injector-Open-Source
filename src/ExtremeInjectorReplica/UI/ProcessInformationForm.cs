@@ -924,34 +924,6 @@ namespace ExtremeInjector.UI
             return list;
         }
 
-        private static List<ThreadInfo> EnumerateThreadsNative(int pid, List<ModuleInfo> modules)
-        {
-            var list = new List<ThreadInfo>();
-
-            try
-            {
-                var proc = Process.GetProcessById(pid);
-                foreach (ProcessThread th in proc.Threads)
-                {
-                    string startAddr = ResolveAddress(th.StartAddress, modules);
-                    string priority = FormatPriority(th.PriorityLevel);
-                    list.Add(new ThreadInfo
-                    {
-                        Id = th.Id,
-                        StartAddress = th.StartAddress,
-                        StartAddressString = startAddr,
-                        Priority = priority
-                    });
-                }
-            }
-            catch
-            {
-                list = EnumerateThreadsFallback(pid, modules);
-            }
-
-            return list;
-        }
-
         private static bool UnloadRemoteModule(int pid, IntPtr moduleBase)
         {
             IntPtr hProcess = OpenProcess(PROCESS_CREATE_THREAD | PROCESS_QUERY_INFORMATION | PROCESS_VM_OPERATION | PROCESS_VM_WRITE | PROCESS_VM_READ, false, pid);
@@ -1083,7 +1055,42 @@ namespace ExtremeInjector.UI
             return list;
         }
 
-        private static List<ThreadInfo> EnumerateThreadsFallback(int pid, List<ModuleInfo> modules)
+        private static IntPtr GetThreadStartAddress(int threadId)
+        {
+            const uint THREAD_QUERY_INFORMATION = 0x0040;
+            const uint THREAD_QUERY_LIMITED_INFORMATION = 0x0800;
+
+            IntPtr hThread = OpenThread(THREAD_QUERY_INFORMATION, false, threadId);
+            if (hThread == IntPtr.Zero)
+            {
+                hThread = OpenThread(THREAD_QUERY_LIMITED_INFORMATION, false, threadId);
+            }
+
+            if (hThread == IntPtr.Zero) return IntPtr.Zero;
+
+            try
+            {
+                int status = NativeMethods.NtQueryInformationThread(
+                    hThread,
+                    NativeMethods.ThreadQuerySetWin32StartAddress,
+                    out IntPtr startAddr,
+                    (uint)IntPtr.Size,
+                    out _
+                );
+
+                return (status == 0) ? startAddr : IntPtr.Zero;
+            }
+            catch
+            {
+                return IntPtr.Zero;
+            }
+            finally
+            {
+                CloseHandle(hThread);
+            }
+        }
+
+        private static List<ThreadInfo> EnumerateThreadsNative(int pid, List<ModuleInfo> modules)
         {
             var list = new List<ThreadInfo>();
             IntPtr hSnap = CreateToolhelp32Snapshot(0x00000004 /* TH32CS_SNAPTHREAD */, 0);
@@ -1098,12 +1105,17 @@ namespace ExtremeInjector.UI
                     {
                         if (te.th32OwnerProcessID == pid)
                         {
+                            int threadId = (int)te.th32ThreadID;
+                            IntPtr rawStartAddress = GetThreadStartAddress(threadId);
+                            string startAddrStr = ResolveAddress(rawStartAddress, modules);
+                            string priorityStr = FormatPriorityFromBasePri(te.tpBasePri);
+
                             list.Add(new ThreadInfo
                             {
-                                Id = (int)te.th32ThreadID,
-                                StartAddress = IntPtr.Zero,
-                                StartAddressString = "Normal",
-                                Priority = "Normal"
+                                Id = threadId,
+                                StartAddress = rawStartAddress,
+                                StartAddressString = startAddrStr,
+                                Priority = priorityStr
                             });
                         }
                     } while (Thread32Next(hSnap, ref te));
@@ -1113,7 +1125,27 @@ namespace ExtremeInjector.UI
             {
                 CloseHandle(hSnap);
             }
+
             return list;
+        }
+
+        private static string FormatPriorityFromBasePri(int basePri)
+        {
+            return basePri switch
+            {
+                <= 1 => "Idle",
+                <= 4 => "Lowest",
+                <= 6 => "Below Normal",
+                8 => "Normal",
+                <= 10 => "Above Normal",
+                <= 14 => "Highest",
+                _ => "Time Critical"
+            };
+        }
+
+        private static List<ThreadInfo> EnumerateThreadsFallback(int pid, List<ModuleInfo> modules)
+        {
+            return EnumerateThreadsNative(pid, modules);
         }
 
         [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
