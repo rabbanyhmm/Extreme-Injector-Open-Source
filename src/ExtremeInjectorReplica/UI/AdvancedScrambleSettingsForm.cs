@@ -95,7 +95,7 @@ namespace ExtremeInjector.UI
             chkRenameSections = new CheckBox { Text = "Rename sections", Location = new Point(10, 92), AutoSize = true };
             chkShiftSectionMemory = new CheckBox { Text = "Shift section memory", Location = new Point(10, 116), AutoSize = true };
             chkStripSection = new CheckBox { Text = "Strip section characteristics", Location = new Point(10, 140), AutoSize = true };
-            chkCreateNewEP = new CheckBox { Text = "Create new entrypoint", Location = new Point(10, 164), AutoSize = true, Enabled = false };
+            chkCreateNewEP = new CheckBox { Text = "Create new entrypoint", Location = new Point(10, 164), AutoSize = true };
 
             grpSection.Controls.AddRange(new Control[] {
                 chkInsertExtraSections,
@@ -118,8 +118,8 @@ namespace ExtremeInjector.UI
 
             chkModifyImportTable = new CheckBox { Text = "Modify import table", Location = new Point(10, 20), AutoSize = true };
             chkRemoveDebugData = new CheckBox { Text = "Remove debug data", Location = new Point(10, 44), AutoSize = true };
-            chkMoveRelocTable = new CheckBox { Text = "Move relocation table", Location = new Point(10, 68), AutoSize = true, Enabled = false };
-            chkCreateFakeDebug = new CheckBox { Text = "Create fake debug directory", Location = new Point(10, 92), AutoSize = true, Enabled = false };
+            chkMoveRelocTable = new CheckBox { Text = "Move relocation table", Location = new Point(10, 68), AutoSize = true };
+            chkCreateFakeDebug = new CheckBox { Text = "Create fake debug directory", Location = new Point(10, 92), AutoSize = true };
 
             grpDirectory.Controls.AddRange(new Control[] {
                 chkModifyImportTable,
