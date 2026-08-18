@@ -1,7 +1,7 @@
-# Extreme Injector Replica — Full Implementation Plan & Roadmap
+# Extreme Injector Replica — Full Implementation Plan & Settings Blueprint
 
-> **Architecture:** Pure C# (.NET Framework 4.8 WinForms) · Single `Extreme Injector v3.exe` · Only dependency: `mscoree.dll` (built into Windows) · Zero files written to disk during operation  
-> All low-level Win32/NTAPI calls via C# P/Invoke — exactly how the original works.
+> **Architecture:** Pure C# (.NET Framework 4.8 WinForms) · Single standalone `Extreme Injector v3.exe` · Only native dependency: `mscoree.dll` (built into Windows) · Zero external DLL drops to disk  
+> All low-level Win32/NTAPI calls executed via C# P/Invoke.
 
 ---
 
@@ -27,57 +27,64 @@
 
 ---
 
-## 2. Master Feature Status Matrix
+## 2. Complete Settings & UI Controls Blueprint
 
-| # | Feature / Module | Status | Classification | Notes |
-|---|---|---|---|---|
-| **PROCESS & WINDOW MANAGEMENT** | | | | |
-| 1 | Process list — Name, PID, Icon | ✅ Done | Core UI | `ProcessSelectForm`, Toolhelp32 snapshot |
-| 2 | Process list — 32/64-bit architecture badge | ✅ Done | Core UI | `IsWow64Process` |
-| 3 | Window list — Title, HWND, Exe name | ✅ Done | Core UI | `EnumWindows` |
-| 4 | Select by Window / Process toggle | ✅ Done | Core UI | Dual mode selection UI |
-| 5 | Auto-refresh process list | ✅ Done | Core UI | Real-time process updates |
-| 6 | Strict process permission filtering | ✅ Done | Security | Hides inaccessible processes per privilege level |
-| **PROCESS INFORMATION DIALOG** | | | | |
-| 7 | Process Header (Icon, Name, PID, Summary) | ✅ Done | Info UI | `Modules: X \| Threads: Y` summary label |
-| 8 | Module list — Name, Base Address, Size, Path | ✅ Done | Module UI | `EnumProcessModulesEx` + `TH32CS_SNAPMODULE` fallback |
-| 9 | Unload Remote Module | ✅ Done | Module Engine | `CreateRemoteThread` → `FreeLibrary` |
-| 10 | Thread list — Thread ID, Priority | ✅ Done | Thread UI | `TH32CS_SNAPTHREAD` + priority formatting |
-| 11 | Thread Start Address (Raw Hex) | ✅ Done | Thread Engine | Low-level `NtQueryInformationThread` (`Class 9`) |
-| 12 | Thread Start Address (Symbol Resolve) | ✅ Done | Thread Engine | Resolves exports (`Module!Export+0xOffset` / `Module+0xRVA`) |
-| 13 | Thread Suspend / Resume | ✅ Done | Thread Control | `SuspendThread` / `ResumeThread` |
-| 14 | Thread Kill | ✅ Done | Thread Control | `TerminateThread` |
-| 15 | Process Kill | ✅ Done | Process Control | `TerminateProcess` |
-| 16 | Module & Thread Column Sorting | ✅ Done | UI Polish | Clickable column headers with sort arrows |
-| **INJECTION ENGINE & METHODS** | | | | |
-| 17 | Standard Inject (LoadLibraryW) | ✅ Done | Engine | PE bitness check, `GetExitCodeThread`, memory cleanup |
-| 18 | LdrLoadDll Inject | ❌ Not Done | Engine | Remote `UNICODE_STRING` + `LdrLoadDll` stub |
-| 19 | Thread Hijacking Inject | ❌ Not Done | Engine | Thread CONTEXT capture + `RIP`/`EIP` redirect |
-| 20 | Manual Map Inject | ❌ Not Done | Complex Engine | PE relocation fix, IAT resolve, DllMain shellcode |
-| **INJECTION OPTIONS** | | | | |
-| 21 | Close on Inject | ✅ Done | Option | `Close()` after successful injection |
-| 22 | Inject Delay (Initial delay ms) | ✅ Done | Option | `Task.Delay(options.Delay)` |
-| 23 | Delay Between (Per-DLL delay ms) | ✅ Done | Option | `Task.Delay(options.DelayBetween)` |
-| 24 | Auto Inject (On process spawn) | ✅ Done | Option | Real-time polling with PID deduplication & lifecycle management |
-| 25 | Stealth Inject (NtCreateThreadEx) | ❌ Not Done | Option | Suppress `DLL_THREAD_ATTACH` callbacks via NTAPI |
-| **POST-INJECTION & PROTECTION** | | | | |
-| 26 | Erase PE Header | ❌ Not Done | Post-Processing | `VirtualProtectEx` + zero-fill remote PE header |
-| 27 | Hide Module (PEB LDR Unlink) | ❌ Not Done | Post-Processing | Unlink `LDR_DATA_TABLE_ENTRY` from remote PEB |
-| 28 | Hide From Debugger | ✅ Done | Advanced Option | `NtSetInformationThread(ThreadHideFromDebugger = 17)` on remote thread |
-| 29 | Start in Secure Mode | ❌ Not Done | Protection | Self-protection & process access ACL modification |
-| **SCRAMBLE ENGINE & ADVANCED** | | | | |
-| 30 | All Scramble Checkboxes Default to TRUE | ✅ Done | Config | `ScrambleConfig` defaults all set to true |
-| 31 | Scramble DLL Master Switch | ⚠️ Partial | UI / Config | Checkbox wired; engine implementation pending |
-| 32 | PE Scrambler Sub-Options (13 settings) | ❌ Not Done | PE Scrambler | Header/Section/Import/Reloc scrambling engine |
-| 33 | Manual Map Advanced Options (SEH/Imports) | ❌ Not Done | Advanced Option | Manual import resolution & exception handling |
-| **SETTINGS & INFRASTRUCTURE** | | | | |
-| 34 | UAC Elevation Prompt + User Mode Fallback | ✅ Done | Security | Prompt on launch, graceful User Mode fallback |
-| 35 | Dynamic System Privileges (SeDebug/SYSTEM) | ✅ Done | Security | `RtlAdjustPrivilege` auto-adjusts privileges |
-| 36 | Color Themes & Live Preview | ✅ Done | Theme System | Real-time theme updates across all windows |
-| 37 | XML Settings Save / Load | ✅ Done | Config Manager | `SettingsManager` persistence |
-| 38 | DLL List Manager (Add, Remove, Clear, Reorder) | ✅ Done | UI Control | Full list control with context menu |
-| 39 | Export & Parameters Config per DLL | ✅ Done | UI Control | `DllItemConfigForm` |
-| 40 | Exact Success & Error MessageBoxes | ✅ Done | UI Polish | Original Extreme Injector dialog formatting |
+Every single control across all dialogs is cataloged below with its persistence and functional status:
+
+### A. Main Settings Dialog (`SettingsForm`)
+
+| Category | UI Control | Control Type | XML Setting Key | Status | Description / Action |
+|---|---|---|---|---|---|
+| **Injection Method** | Method Selector | `ComboBox` (5 items) | `<Method>` | ⚠️ Partial | `0: Standard`, `1: Thread Hijacking`, `2: LdrLoadDll`, `3: LdrpLoadDll`, `4: Manual Map` |
+| | Advanced Button | `Button` | — | ✅ Done | Opens `AdvancedInjectionSettingsForm` |
+| **Scrambling Options** | Preset Selector | `ComboBox` (5 items) | `<Scramble>` preset | ⚠️ Partial | `None`, `Basic`, `Standard`, `Extreme`, `Custom` presets |
+| | Advanced Button | `Button` | — | ✅ Done | Opens `AdvancedScrambleSettingsForm` |
+| **Injection Options** | Auto Inject | `CheckBox` | `<AutoInject>` | ✅ Done | 400ms polling watcher with PID deduplication & lifecycle cleanup |
+| | Close on inject | `CheckBox` | `<CloseOnInject>` | ✅ Done | Auto-closes application upon successful injection |
+| | Stealth Inject | `CheckBox` | `<StealthInject>` | ❌ Not Done | Uses `NtCreateThreadEx` with `SKIP_THREAD_ATTACH (0x04)` |
+| | Inject delay | `NumericUpDown` (0–60000ms) | `<Delay>` | ✅ Done | Delay before initial injection batch (`Task.Delay`) |
+| | Delay between | `NumericUpDown` (0–60000ms) | `<DelayBetween>` | ✅ Done | Delay between consecutive DLL injections (`Task.Delay`) |
+| **Post-Inject Options** | Erase PE | `CheckBox` | `<ErasePE>` | ❌ Not Done | Zero-fills remote `IMAGE_DOS_HEADER` & `IMAGE_NT_HEADERS` |
+| | Hide Module | `CheckBox` | `<HideModule>` | ❌ Not Done | Unlinks `LDR_DATA_TABLE_ENTRY` from remote PEB loader lists |
+| **Theme Options** | Text Color | `Panel` / ColorDialog | `<TextColor>` | ✅ Done | Real-time live preview & persistence across forms |
+| | Background Color #1 | `Panel` / ColorDialog | `<Background1>` | ✅ Done | Gradient starting color with live preview |
+| | Background Color #2 | `Panel` / ColorDialog | `<Background2>` | ✅ Done | Gradient ending color with live preview |
+| **Tools** | View Process Info | `Button` | — | ✅ Done | Launches `ProcessInformationForm` for selected or picked PID |
+| | Scramble DLL | `Button` | — | ❌ Not Done | Standalone DLL file scrambler tool (`SaveFileDialog`) |
+| | Start in Secure Mode | `Button` | — | ❌ Not Done | Restricts process security descriptors & token ACLs |
+| **Bottom Bar** | Reset | `Button` | — | ✅ Done | Restores all settings and colors to default values |
+| | OK | `Button` | — | ✅ Done | Saves settings to XML and applies theme |
+
+---
+
+### B. Advanced Injection Settings Dialog (`AdvancedInjectionSettingsForm`)
+
+| GroupBox | UI Control | Control Type | XML Setting Key | Status | Low-Level Kernel Mechanism |
+|---|---|---|---|---|---|
+| **General** | Hide threads from debugger | `CheckBox` | `<HideFromDebugger>` | ✅ Done | `NtSetInformationThread(hThread, ThreadHideFromDebugger = 17, NULL, 0)` |
+| **Manual Map Options** | Manually map imports | `CheckBox` | `<ManualResolveImports>` | ❌ Not Done | Remote PEB module walk & custom export resolution |
+| | Disable exception support | `CheckBox` | `<DisableExceptionSupport>` | ❌ Not Done | Omits exception directory registration in remote runtime |
+| | Disable SEH validation | `CheckBox` | `<DisableSEHValidation>` | ❌ Not Done | Disables structured exception handler validation table |
+
+---
+
+### C. Advanced Scramble Settings Dialog (`AdvancedScrambleSettingsForm`) — All 13 Sub-Options
+
+| GroupBox | # | Scramble Option Name | Control Type | XML Setting Key | Status | PE Manipulation Technique |
+|---|---|---|---|---|---|---|
+| **Header Options** | 1 | Scramble header fields | `CheckBox` | `<ScrambleHeaderFields>` | ❌ Not Done | Randomize PE checksum, TimeDateStamp, OS/linker version fields |
+| | 2 | Remove useless data | `CheckBox` | `<RemoveUselessData>` | ❌ Not Done | Zero-fill DOS stub padding, Rich Header, and unused header fields |
+| **Section Options** | 3 | Insert extra sections | `CheckBox` | `<InsertExtraSections>` | ❌ Not Done | Append dummy section headers filled with randomized byte sequences |
+| | 4 | Shift section data | `CheckBox` | `<ShiftSectionData>` | ❌ Not Done | Shift file offsets (`PointerToRawData`) and pad raw alignment |
+| | 5 | Modify assembly code | `CheckBox` | `<ModifyAssemblyCode>` | ❌ Not Done | Inject junk NOP sequences & harmless instruction permutations |
+| | 6 | Rename sections | `CheckBox` | `<RenameSections>` | ❌ Not Done | Randomize standard names (`.text`, `.data`, `.rdata`) to random chars |
+| | 7 | Shift section memory | `CheckBox` | `<ShiftSectionMemory>` | ❌ Not Done | Alter `VirtualAddress` offsets within allowed section alignments |
+| | 8 | Strip section characteristics | `CheckBox` | `<StripSectionCharacteristics>` | ❌ Not Done | Strip non-essential `IMAGE_SCN_*` flags from section headers |
+| | 9 | Create new entrypoint | `CheckBox` | `<CreateNewEntryPoint>` | ❌ Not Done | Generate a redirection trampoline stub as the new `AddressOfEntryPoint` |
+| **Directory Options** | 10 | Modify import table | `CheckBox` | `<ModifyImportTable>` | ❌ Not Done | Shuffle import descriptor order and scramble module descriptor names |
+| | 11 | Remove debug data | `CheckBox` | `<RemoveDebugData>` | ❌ Not Done | Zero out `IMAGE_DIRECTORY_ENTRY_DEBUG` and CodeView PDB path string |
+| | 12 | Move relocation table | `CheckBox` | `<MoveRelocationTable>` | ❌ Not Done | Relocate `IMAGE_DIRECTORY_ENTRY_BASERELOC` to a relocated section |
+| | 13 | Create fake debug directory | `CheckBox` | `<CreateFakeDebugDirectory>` | ❌ Not Done | Insert a synthetic PDB file path and fake debug GUID directory |
 
 ---
 
@@ -85,16 +92,16 @@
 
 Below is the ordered implementation backlog arranged strictly from **simplest, easiest tasks** up to **most complex engineering tasks**:
 
-| Priority | Task Name | Complexity | Category | Implementation Strategy |
-|---|---|---|---|---|
-| **1** | **Auto Inject Timer** | 🟢 Easy | Feature | Add a 500ms `System.Windows.Forms.Timer` in `MainForm` to watch for process appearance and trigger injection |
-| **2** | **Hide From Debugger** | 🟢 Easy | Advanced Option | Call `NtSetInformationThread(hThread, ThreadHideFromDebugger=17, NULL, 0)` after remote thread creation |
-| **3** | **Erase PE Header** | 🟡 Moderate | Post-Processing | Call `VirtualProtectEx` on remote DLL base address to `PAGE_READWRITE`, write 0x1000 zero bytes, and restore protection |
-| **4** | **Stealth Inject (NtCreateThreadEx)** | 🟡 Moderate | Injection Option | Wrap `ntdll!NtCreateThreadEx` with `THREAD_CREATE_FLAGS_SKIP_THREAD_ATTACH` (`0x0004`) flag |
-| **5** | **LdrLoadDll Inject** | 🟡 Moderate | Injection Method | Allocate `UNICODE_STRING` + DLL path in remote process, write x86/x64 stub calling `ntdll!LdrLoadDll` |
-| **6** | **Hide Module (PEB LDR Unlink)** | 🟠 High | Post-Processing | Query PEB address via `NtQueryInformationProcess`, walk `PEB_LDR_DATA` chains (`InLoad`, `InMemory`, `InInit`), and unlink pointers via `WriteProcessMemory` |
-| **7** | **Thread Hijacking Inject** | 🟠 High | Injection Method | Enumerate threads, suspend one, capture register context via `GetThreadContext`, write shellcode stub, update `RIP`/`EIP` via `SetThreadContext`, and resume |
-| **8** | **PE Scrambler Engine** | 🔴 Complex | PE Scrambler | Implement `PeScrambler.cs` to scramble headers, section names, debug directories, relocation tables, and import structures in target memory |
-| **9** | **Manual Map Inject** | 🔴 Complex | Injection Method | Build in-memory PE mapper: allocate remote image memory, copy sections, resolve base relocations, resolve IAT imports, and execute `DllMain` via shellcode |
-| **10** | **Manual Map Advanced Options** | 🔴 Complex | Advanced Option | Implement manual IAT resolution by walking remote PEB, and SEH/Exception table registration handling |
-| **11** | **Start in Secure Mode** | 🔴 Complex | Protection | Implement process ACL restriction & self-protection routines |
+| Priority | Task Name | Complexity | Category | Implementation Strategy | Status |
+|---|---|---|---|---|---|
+| **1** | **Auto Inject Timer** | 🟢 Easy | Feature | 400ms background polling timer with PID deduplication & lifecycle cleanup | ✅ **Done** |
+| **2** | **Hide From Debugger** | 🟢 Easy | Advanced Option | `NtSetInformationThread(hThread, ThreadHideFromDebugger = 17)` on remote thread | ✅ **Done** |
+| **3** | **Erase PE Header** | 🟡 Moderate | Post-Processing | `VirtualProtectEx` + zero-fill 0x1000 bytes over remote `IMAGE_DOS_HEADER` & `IMAGE_NT_HEADERS` | ⏳ Up Next |
+| **4** | **Stealth Inject (`NtCreateThreadEx`)** | 🟡 Moderate | Injection Option | Call `NtCreateThreadEx` passing `THREAD_CREATE_FLAGS_SKIP_THREAD_ATTACH (0x0004)` flag | ⏳ Pending |
+| **5** | **LdrLoadDll Inject** | 🟡 Moderate | Injection Method | Allocate `UNICODE_STRING` + DLL path in remote process; execute `ntdll!LdrLoadDll` stub | ⏳ Pending |
+| **6** | **Hide Module (PEB LDR Unlink)** | 🟠 High | Post-Processing | Query PEB via `NtQueryInformationProcess`; walk `PEB_LDR_DATA` chains and unlink pointers | ⏳ Pending |
+| **7** | **Thread Hijacking Inject** | 🟠 High | Injection Method | Suspend thread → capture `CONTEXT` (`GetThreadContext`) → write shellcode → update `RIP`/`EIP` → resume | ⏳ Pending |
+| **8** | **PE Scrambler Engine (13 Options)** | 🔴 Complex | PE Scrambler | Implement `PeScrambler.cs` covering Header, Section, Directory, and Import table transformations | ⏳ Pending |
+| **9** | **Manual Map Inject** | 🔴 Complex | Injection Method | Pure C# in-memory PE loader: section allocation, relocation fixing, IAT resolution, `DllMain` stub | ⏳ Pending |
+| **10** | **Manual Map Advanced Options** | 🔴 Complex | Advanced Option | Manual import resolution via remote PEB walk and SEH/Exception directory registration | ⏳ Pending |
+| **11** | **Start in Secure Mode** | 🔴 Complex | Protection | Restrict process security descriptors & token ACLs to prevent unauthorized inspection | ⏳ Pending |
