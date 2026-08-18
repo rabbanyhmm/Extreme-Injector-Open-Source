@@ -22,7 +22,14 @@ namespace ExtremeInjector.Core
                 return result;
             }
 
-            var targetProcess = processes.First();
+            var targetProcess = processes.FirstOrDefault(p => PrivilegeManager.CanQueryProcess(p.Id));
+            if (targetProcess == null)
+            {
+                result.Success = false;
+                result.ErrorMessage = $"Access Denied: Target process '{processName}' requires elevated Administrator privileges to access.";
+                return result;
+            }
+
             int pid = targetProcess.Id;
 
             if (options.Delay > 0)

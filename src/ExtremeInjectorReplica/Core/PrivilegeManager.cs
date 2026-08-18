@@ -77,5 +77,33 @@ namespace ExtremeInjector.Core
                 return false;
             }
         }
+        public static bool CanOpenProcessAccess(int processId, uint requiredAccess)
+        {
+            if (processId <= 4) return false;
+
+            IntPtr hProc = NativeMethods.OpenProcess(requiredAccess, false, processId);
+            if (hProc != IntPtr.Zero)
+            {
+                NativeMethods.CloseHandle(hProc);
+                return true;
+            }
+            return false;
+        }
+
+        public static bool CanInjectProcess(int processId)
+        {
+            const uint INJECT_ACCESS = NativeMethods.PROCESS_CREATE_THREAD |
+                                       NativeMethods.PROCESS_VM_OPERATION |
+                                       NativeMethods.PROCESS_VM_WRITE |
+                                       NativeMethods.PROCESS_VM_READ;
+
+            return CanOpenProcessAccess(processId, INJECT_ACCESS);
+        }
+
+        public static bool CanQueryProcess(int processId)
+        {
+            return CanOpenProcessAccess(processId, NativeMethods.PROCESS_QUERY_INFORMATION) ||
+                   CanOpenProcessAccess(processId, NativeMethods.PROCESS_QUERY_LIMITED_INFORMATION);
+        }
     }
 }

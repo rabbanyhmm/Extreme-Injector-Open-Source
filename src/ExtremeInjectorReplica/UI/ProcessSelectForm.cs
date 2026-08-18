@@ -185,6 +185,8 @@ namespace ExtremeInjector.UI
                 {
                     try
                     {
+                        if (!ExtremeInjector.Core.PrivilegeManager.CanQueryProcess(w.Pid)) continue;
+
                         Image? icon = GetWindowIcon(w.HWnd, w.Pid);
                         if (icon == null)
                         {
@@ -221,7 +223,8 @@ namespace ExtremeInjector.UI
                 {
                     try
                     {
-                        if (p.Id == 0 || p.Id == 4) continue;
+                        if (p.Id <= 4) continue;
+                        if (!ExtremeInjector.Core.PrivilegeManager.CanQueryProcess(p.Id)) continue;
 
                         Image? icon = GetProcessIcon(p);
                         if (icon == null)
