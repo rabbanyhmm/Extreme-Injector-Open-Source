@@ -22,6 +22,13 @@
     <None Update="ExtremeInjector.ico">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <!-- Native C++ Core DLLs — embedded as resources, zero disk drops at runtime -->
+    <EmbeddedResource Include="Resources\InjectorCore32.dll">
+      <LogicalName>InjectorCore32.dll</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\InjectorCore64.dll">
+      <LogicalName>InjectorCore64.dll</LogicalName>
+    </EmbeddedResource>
   </ItemGroup>
 
 </Project>
