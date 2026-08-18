@@ -271,5 +271,308 @@ namespace ExtremeInjector.Core
                 return false;
             }
         }
+
+        /// <summary>
+        /// Unlinks the loaded DLL from the remote PEB_LDR_DATA chains (InLoadOrder, InMemoryOrder, InInitializationOrder).
+        /// Hides the module from standard user-mode module enumeration tools.
+        /// </summary>
+        public static bool HideModule(int processId, string dllPath, out string errorMessage)
+        {
+            errorMessage = "";
+            IntPtr moduleBase = FindRemoteModuleBase(processId, dllPath);
+            if (moduleBase == IntPtr.Zero)
+            {
+                errorMessage = $"Could not locate remote module base for '{Path.GetFileName(dllPath)}' (PID: {processId}).";
+                return false;
+            }
+
+            const uint PROCESS_ACCESS = NativeMethods.PROCESS_QUERY_INFORMATION |
+                                         NativeMethods.PROCESS_VM_READ |
+                                         NativeMethods.PROCESS_VM_WRITE |
+                                         NativeMethods.PROCESS_VM_OPERATION |
+                                         NativeMethods.THREAD_SUSPEND_RESUME;
+
+            IntPtr hProcess = NativeMethods.OpenProcess(PROCESS_ACCESS, false, processId);
+            if (hProcess == IntPtr.Zero)
+            {
+                int err = Marshal.GetLastWin32Error();
+                errorMessage = $"Failed to open process (PID: {processId}) for Hide Module.\nWin32 Error {err}: {new Win32Exception(err).Message}";
+                return false;
+            }
+
+            try
+            {
+                bool isTarget64 = Environment.Is64BitOperatingSystem;
+                if (Environment.Is64BitOperatingSystem && NativeMethods.IsWow64Process(hProcess, out bool isWow64))
+                {
+                    isTarget64 = !isWow64;
+                }
+
+                return HideModule(hProcess, isTarget64, moduleBase, out errorMessage);
+            }
+            finally
+            {
+                NativeMethods.CloseHandle(hProcess);
+            }
+        }
+
+        /// <summary>
+        /// Unlinks a module from remote PEB loader lists using an open process handle.
+        /// </summary>
+        public static bool HideModule(IntPtr hProcess, bool isTarget64, IntPtr moduleBase, out string errorMessage)
+        {
+            errorMessage = "";
+            if (hProcess == IntPtr.Zero || moduleBase == IntPtr.Zero)
+            {
+                errorMessage = "Invalid process handle or module base pointer.";
+                return false;
+            }
+
+            bool suspended = false;
+            try
+            {
+                // 1. Freeze remote process threads to prevent race conditions during list modifications
+                suspended = (NativeMethods.NtSuspendProcess(hProcess) == 0);
+
+                if (isTarget64)
+                {
+                    return UnlinkModule64(hProcess, moduleBase, out errorMessage);
+                }
+                else
+                {
+                    return UnlinkModule32(hProcess, moduleBase, out errorMessage);
+                }
+            }
+            catch (Exception ex)
+            {
+                errorMessage = $"Unexpected exception in HideModule: {ex.Message}";
+                return false;
+            }
+            finally
+            {
+                // 2. Unconditionally resume target process
+                if (suspended)
+                {
+                    NativeMethods.NtResumeProcess(hProcess);
+                }
+            }
+        }
+
+        private static bool UnlinkModule64(IntPtr hProcess, IntPtr moduleBase, out string errorMessage)
+        {
+            errorMessage = "";
+            int status = NativeMethods.NtQueryInformationProcess(
+                hProcess,
+                NativeMethods.ProcessBasicInformation,
+                out NativeMethods.PROCESS_BASIC_INFORMATION pbi,
+                (uint)Marshal.SizeOf(typeof(NativeMethods.PROCESS_BASIC_INFORMATION)),
+                out _
+            );
+
+            if (status != 0 || pbi.PebBaseAddress == IntPtr.Zero)
+            {
+                errorMessage = $"Failed to query 64-bit PEB address (NTSTATUS 0x{status:X}).";
+                return false;
+            }
+
+            // PEB64.Ldr at offset 0x18
+            byte[] ldrPtrBytes = new byte[8];
+            if (!NativeMethods.ReadProcessMemory(hProcess, (IntPtr)(pbi.PebBaseAddress.ToInt64() + 0x18), ldrPtrBytes, (UIntPtr)8, out _))
+            {
+                errorMessage = "Failed to read PEB64.Ldr pointer.";
+                return false;
+            }
+            long pLdrData = BitConverter.ToInt64(ldrPtrBytes, 0);
+            if (pLdrData == 0)
+            {
+                errorMessage = "PEB_LDR_DATA pointer is NULL.";
+                return false;
+            }
+
+            // InLoadOrderModuleList head at pLdrData + 0x10
+            IntPtr inLoadOrderHead = (IntPtr)(pLdrData + 0x10);
+            byte[] linkBytes = new byte[8];
+            if (!NativeMethods.ReadProcessMemory(hProcess, inLoadOrderHead, linkBytes, (UIntPtr)8, out _))
+            {
+                errorMessage = "Failed to read InLoadOrderModuleList head.";
+                return false;
+            }
+
+            long currentFlink = BitConverter.ToInt64(linkBytes, 0);
+            long listHeadAddr = inLoadOrderHead.ToInt64();
+            int maxModules = 500;
+            int counter = 0;
+
+            while (currentFlink != 0 && currentFlink != listHeadAddr && counter++ < maxModules)
+            {
+                IntPtr entryAddr = (IntPtr)currentFlink;
+
+                // LDR_DATA_TABLE_ENTRY_64:
+                // 0x00: InLoadOrderLinks (Flink 0x00, Blink 0x08)
+                // 0x10: InMemoryOrderLinks (Flink 0x10, Blink 0x18)
+                // 0x20: InInitializationOrderLinks (Flink 0x20, Blink 0x28)
+                // 0x30: DllBase (8 bytes)
+                byte[] entryHeader = new byte[0x38];
+                if (!NativeMethods.ReadProcessMemory(hProcess, entryAddr, entryHeader, (UIntPtr)0x38, out _))
+                    break;
+
+                long dllBase = BitConverter.ToInt64(entryHeader, 0x30);
+                long nextFlink = BitConverter.ToInt64(entryHeader, 0x00);
+
+                if (dllBase == moduleBase.ToInt64())
+                {
+                    // Unlink from InLoadOrderLinks (offset 0x00)
+                    UnlinkEntry64(hProcess, entryAddr, 0x00);
+
+                    // Unlink from InMemoryOrderLinks (offset 0x10)
+                    UnlinkEntry64(hProcess, entryAddr, 0x10);
+
+                    // Unlink from InInitializationOrderLinks (offset 0x20)
+                    UnlinkEntry64(hProcess, entryAddr, 0x20);
+
+                    // Zero-fill entry structure to prevent residual heuristics
+                    byte[] zeroBytes = new byte[0x60];
+                    NativeMethods.WriteProcessMemory(hProcess, entryAddr, zeroBytes, (UIntPtr)zeroBytes.Length, out _);
+
+                    return true;
+                }
+
+                currentFlink = nextFlink;
+            }
+
+            errorMessage = $"Module 0x{moduleBase.ToInt64():X} not found in remote 64-bit loader lists.";
+            return false;
+        }
+
+        private static bool UnlinkModule32(IntPtr hProcess, IntPtr moduleBase, out string errorMessage)
+        {
+            errorMessage = "";
+            int status = NativeMethods.NtQueryInformationProcess(
+                hProcess,
+                NativeMethods.ProcessWow64Information,
+                out IntPtr pebBase32,
+                (uint)IntPtr.Size,
+                out _
+            );
+
+            if (status != 0 || pebBase32 == IntPtr.Zero)
+            {
+                errorMessage = $"Failed to query 32-bit (WoW64) PEB address (NTSTATUS 0x{status:X}).";
+                return false;
+            }
+
+            // PEB32.Ldr at offset 0x0C
+            byte[] ldrPtrBytes = new byte[4];
+            if (!NativeMethods.ReadProcessMemory(hProcess, (IntPtr)(pebBase32.ToInt64() + 0x0C), ldrPtrBytes, (UIntPtr)4, out _))
+            {
+                errorMessage = "Failed to read PEB32.Ldr pointer.";
+                return false;
+            }
+            uint pLdrData32 = BitConverter.ToUInt32(ldrPtrBytes, 0);
+            if (pLdrData32 == 0)
+            {
+                errorMessage = "32-bit PEB_LDR_DATA pointer is NULL.";
+                return false;
+            }
+
+            // InLoadOrderModuleList head at pLdrData32 + 0x0C
+            IntPtr inLoadOrderHead = (IntPtr)pLdrData32 + 0x0C;
+            byte[] linkBytes = new byte[4];
+            if (!NativeMethods.ReadProcessMemory(hProcess, inLoadOrderHead, linkBytes, (UIntPtr)4, out _))
+            {
+                errorMessage = "Failed to read 32-bit InLoadOrderModuleList head.";
+                return false;
+            }
+
+            uint currentFlink = BitConverter.ToUInt32(linkBytes, 0);
+            uint listHeadAddr = (uint)inLoadOrderHead.ToInt64();
+            int maxModules = 500;
+            int counter = 0;
+            uint targetBase32 = (uint)moduleBase.ToInt32();
+
+            while (currentFlink != 0 && currentFlink != listHeadAddr && counter++ < maxModules)
+            {
+                IntPtr entryAddr = (IntPtr)currentFlink;
+
+                // LDR_DATA_TABLE_ENTRY_32:
+                // 0x00: InLoadOrderLinks (Flink 0x00, Blink 0x04)
+                // 0x08: InMemoryOrderLinks (Flink 0x08, Blink 0x0C)
+                // 0x10: InInitializationOrderLinks (Flink 0x10, Blink 0x14)
+                // 0x18: DllBase (4 bytes)
+                byte[] entryHeader = new byte[0x1C];
+                if (!NativeMethods.ReadProcessMemory(hProcess, entryAddr, entryHeader, (UIntPtr)0x1C, out _))
+                    break;
+
+                uint dllBase = BitConverter.ToUInt32(entryHeader, 0x18);
+                uint nextFlink = BitConverter.ToUInt32(entryHeader, 0x00);
+
+                if (dllBase == targetBase32)
+                {
+                    // Unlink from InLoadOrderLinks (offset 0x00)
+                    UnlinkEntry32(hProcess, entryAddr, 0x00);
+
+                    // Unlink from InMemoryOrderLinks (offset 0x08)
+                    UnlinkEntry32(hProcess, entryAddr, 0x08);
+
+                    // Unlink from InInitializationOrderLinks (offset 0x10)
+                    UnlinkEntry32(hProcess, entryAddr, 0x10);
+
+                    // Zero-fill entry structure
+                    byte[] zeroBytes = new byte[0x30];
+                    NativeMethods.WriteProcessMemory(hProcess, entryAddr, zeroBytes, (UIntPtr)zeroBytes.Length, out _);
+
+                    return true;
+                }
+
+                currentFlink = nextFlink;
+            }
+
+            errorMessage = $"Module 0x{moduleBase.ToInt64():X} not found in remote 32-bit loader lists.";
+            return false;
+        }
+
+        private static void UnlinkEntry64(IntPtr hProcess, IntPtr entryBase, int linkOffset)
+        {
+            IntPtr linkAddr = (IntPtr)(entryBase.ToInt64() + linkOffset);
+            byte[] buf = new byte[16];
+            if (!NativeMethods.ReadProcessMemory(hProcess, linkAddr, buf, (UIntPtr)16, out _))
+                return;
+
+            long flink = BitConverter.ToInt64(buf, 0);
+            long blink = BitConverter.ToInt64(buf, 8);
+
+            if (flink != 0 && blink != 0)
+            {
+                // blink->Flink = flink (offset 0x00 of Blink node)
+                byte[] flinkBytes = BitConverter.GetBytes(flink);
+                NativeMethods.WriteProcessMemory(hProcess, (IntPtr)blink, flinkBytes, (UIntPtr)8, out _);
+
+                // flink->Blink = blink (offset 0x08 of Flink node)
+                byte[] blinkBytes = BitConverter.GetBytes(blink);
+                NativeMethods.WriteProcessMemory(hProcess, (IntPtr)(flink + 8), blinkBytes, (UIntPtr)8, out _);
+            }
+        }
+
+        private static void UnlinkEntry32(IntPtr hProcess, IntPtr entryBase, int linkOffset)
+        {
+            IntPtr linkAddr = (IntPtr)(entryBase.ToInt64() + linkOffset);
+            byte[] buf = new byte[8];
+            if (!NativeMethods.ReadProcessMemory(hProcess, linkAddr, buf, (UIntPtr)8, out _))
+                return;
+
+            uint flink = BitConverter.ToUInt32(buf, 0);
+            uint blink = BitConverter.ToUInt32(buf, 4);
+
+            if (flink != 0 && blink != 0)
+            {
+                // blink->Flink = flink (offset 0x00 of Blink node)
+                byte[] flinkBytes = BitConverter.GetBytes(flink);
+                NativeMethods.WriteProcessMemory(hProcess, (IntPtr)blink, flinkBytes, (UIntPtr)4, out _);
+
+                // flink->Blink = blink (offset 0x04 of Flink node)
+                byte[] blinkBytes = BitConverter.GetBytes(blink);
+                NativeMethods.WriteProcessMemory(hProcess, (IntPtr)(flink + 4), blinkBytes, (UIntPtr)4, out _);
+            }
+        }
     }
 }

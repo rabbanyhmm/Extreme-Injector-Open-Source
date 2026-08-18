@@ -216,6 +216,44 @@ namespace ExtremeInjector.Core
             out uint returnLength
         );
 
+        [StructLayout(LayoutKind.Sequential)]
+        public struct PROCESS_BASIC_INFORMATION
+        {
+            public IntPtr ExitStatus;
+            public IntPtr PebBaseAddress;
+            public IntPtr AffinityMask;
+            public IntPtr BasePriority;
+            public IntPtr UniqueProcessId;
+            public IntPtr InheritedFromUniqueProcessId;
+        }
+
+        public const int ProcessBasicInformation = 0;
+        public const int ProcessWow64Information = 26;
+
+        [DllImport("ntdll.dll", SetLastError = true)]
+        public static extern int NtQueryInformationProcess(
+            IntPtr processHandle,
+            int processInformationClass,
+            out PROCESS_BASIC_INFORMATION processInformation,
+            uint processInformationLength,
+            out uint returnLength
+        );
+
+        [DllImport("ntdll.dll", SetLastError = true)]
+        public static extern int NtQueryInformationProcess(
+            IntPtr processHandle,
+            int processInformationClass,
+            out IntPtr processInformation,
+            uint processInformationLength,
+            out uint returnLength
+        );
+
+        [DllImport("ntdll.dll", SetLastError = true)]
+        public static extern int NtSuspendProcess(IntPtr processHandle);
+
+        [DllImport("ntdll.dll", SetLastError = true)]
+        public static extern int NtResumeProcess(IntPtr processHandle);
+
         /// <summary>
         /// Creates a remote thread supporting Stealth Inject (SKIP_THREAD_ATTACH) and HideFromDebugger with automatic fallback.
         /// </summary>

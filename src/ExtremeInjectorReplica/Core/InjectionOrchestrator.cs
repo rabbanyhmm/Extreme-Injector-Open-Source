@@ -67,6 +67,11 @@ namespace ExtremeInjector.Core
                     {
                         PostProcessor.ErasePEHeader(pid, dll, out _);
                     }
+
+                    if (options.HideModule)
+                    {
+                        PostProcessor.HideModule(pid, dll, out _);
+                    }
                 }
                 else
                 {
