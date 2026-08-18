@@ -1,7 +1,5 @@
 using System;
-using System.Collections.Generic;
 using System.ComponentModel;
-using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -20,86 +18,143 @@ namespace ExtremeInjector.Core
         private static extern uint GetModuleBaseName(IntPtr hProcess, IntPtr hModule, [Out] StringBuilder lpBaseName, uint nSize);
 
         /// <summary>
-        /// Finds the base address of a loaded module in a remote process.
+        /// Finds the base address of a loaded module in a remote process using both EnumProcessModulesEx and Toolhelp32 snapshot.
         /// </summary>
         public static IntPtr FindRemoteModuleBase(int processId, string dllPath)
         {
+            if (processId <= 0 || string.IsNullOrWhiteSpace(dllPath))
+                return IntPtr.Zero;
+
             string targetFileName = Path.GetFileName(dllPath);
             string targetFullPath = Path.GetFullPath(dllPath);
 
-            IntPtr hProcess = NativeMethods.OpenProcess(
-                NativeMethods.PROCESS_QUERY_INFORMATION | NativeMethods.PROCESS_VM_READ,
-                false,
-                processId
-            );
-
-            if (hProcess == IntPtr.Zero)
+            // =========================================================================
+            // Method 1: EnumProcessModulesEx (Direct PSAPI Module Walk)
+            // =========================================================================
+            try
             {
-                // Fallback with QUERY_LIMITED_INFORMATION
-                hProcess = NativeMethods.OpenProcess(
-                    NativeMethods.PROCESS_QUERY_LIMITED_INFORMATION | NativeMethods.PROCESS_VM_READ,
+                IntPtr hProcess = NativeMethods.OpenProcess(
+                    NativeMethods.PROCESS_QUERY_INFORMATION | NativeMethods.PROCESS_VM_READ,
                     false,
                     processId
                 );
-            }
 
-            if (hProcess != IntPtr.Zero)
-            {
-                try
+                if (hProcess == IntPtr.Zero)
                 {
-                    if (EnumProcessModulesEx(hProcess, null, 0, out uint needed, 0x03 /* LIST_MODULES_ALL */) && needed > 0)
+                    // Fallback to limited information query
+                    hProcess = NativeMethods.OpenProcess(
+                        NativeMethods.PROCESS_QUERY_LIMITED_INFORMATION | NativeMethods.PROCESS_VM_READ,
+                        false,
+                        processId
+                    );
+                }
+
+                if (hProcess != IntPtr.Zero)
+                {
+                    try
                     {
-                        int count = (int)(needed / IntPtr.Size);
-                        var hMods = new IntPtr[count];
-                        if (EnumProcessModulesEx(hProcess, hMods, needed, out _, 0x03))
+                        if (EnumProcessModulesEx(hProcess, null, 0, out uint needed, 0x03 /* LIST_MODULES_ALL */) && needed > 0)
                         {
-                            var sbName = new StringBuilder(1024);
-                            var sbPath = new StringBuilder(1024);
-
-                            for (int i = 0; i < count; i++)
+                            int count = (int)(needed / (uint)IntPtr.Size);
+                            var hMods = new IntPtr[count];
+                            if (EnumProcessModulesEx(hProcess, hMods, needed, out _, 0x03))
                             {
-                                sbName.Clear();
-                                sbPath.Clear();
+                                var sbName = new StringBuilder(1024);
+                                var sbPath = new StringBuilder(1024);
 
-                                GetModuleBaseName(hProcess, hMods[i], sbName, (uint)sbName.Capacity);
-                                GetModuleFileNameEx(hProcess, hMods[i], sbPath, (uint)sbPath.Capacity);
-
-                                string modName = sbName.ToString();
-                                string modPath = sbPath.ToString();
-
-                                if (string.Equals(modName, targetFileName, StringComparison.OrdinalIgnoreCase) ||
-                                    string.Equals(modPath, targetFullPath, StringComparison.OrdinalIgnoreCase))
+                                for (int i = 0; i < count; i++)
                                 {
-                                    return hMods[i];
+                                    sbName.Clear();
+                                    sbPath.Clear();
+
+                                    GetModuleBaseName(hProcess, hMods[i], sbName, (uint)sbName.Capacity);
+                                    GetModuleFileNameEx(hProcess, hMods[i], sbPath, (uint)sbPath.Capacity);
+
+                                    string modName = sbName.ToString();
+                                    string modPath = sbPath.ToString();
+
+                                    if (string.Equals(modName, targetFileName, StringComparison.OrdinalIgnoreCase) ||
+                                        string.Equals(modPath, targetFullPath, StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        return hMods[i];
+                                    }
                                 }
                             }
                         }
                     }
+                    finally
+                    {
+                        NativeMethods.CloseHandle(hProcess);
+                    }
                 }
-                finally
+            }
+            catch
+            {
+                // Fall through to Toolhelp32 snapshot
+            }
+
+            // =========================================================================
+            // Method 2: Toolhelp32 Snapshot (Fallback for WoW64 / Cross-Architecture)
+            // =========================================================================
+            try
+            {
+                uint flags = NativeMethods.TH32CS_SNAPMODULE | NativeMethods.TH32CS_SNAPMODULE32;
+                IntPtr hSnapshot = NativeMethods.CreateToolhelp32Snapshot(flags, (uint)processId);
+
+                if (hSnapshot != IntPtr.Zero && hSnapshot != new IntPtr(-1))
                 {
-                    NativeMethods.CloseHandle(hProcess);
+                    try
+                    {
+                        var me = new NativeMethods.MODULEENTRY32 { dwSize = (uint)Marshal.SizeOf(typeof(NativeMethods.MODULEENTRY32)) };
+                        if (NativeMethods.Module32First(hSnapshot, ref me))
+                        {
+                            do
+                            {
+                                if (string.Equals(me.szModule, targetFileName, StringComparison.OrdinalIgnoreCase) ||
+                                    string.Equals(me.szExePath, targetFullPath, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    return me.modBaseAddr;
+                                }
+                            } while (NativeMethods.Module32Next(hSnapshot, ref me));
+                        }
+                    }
+                    finally
+                    {
+                        NativeMethods.CloseHandle(hSnapshot);
+                    }
                 }
+            }
+            catch
+            {
+                // Return zero on snapshot failure
             }
 
             return IntPtr.Zero;
         }
 
         /// <summary>
-        /// Erases the PE header (0x1000 bytes) of an injected module in a target process.
+        /// Erases the PE header (0x1000 bytes) of an injected module in a target process by DLL path.
         /// </summary>
         public static bool ErasePEHeader(int processId, string dllPath, out string errorMessage)
         {
             errorMessage = "";
-            IntPtr moduleBase = FindRemoteModuleBase(processId, dllPath);
-
-            if (moduleBase == IntPtr.Zero)
+            try
             {
-                errorMessage = $"Could not locate base address for '{Path.GetFileName(dllPath)}' in target process.";
+                IntPtr moduleBase = FindRemoteModuleBase(processId, dllPath);
+
+                if (moduleBase == IntPtr.Zero)
+                {
+                    errorMessage = $"Could not locate base address for '{Path.GetFileName(dllPath)}' in target process (PID: {processId}).";
+                    return false;
+                }
+
+                return ErasePEHeader(processId, moduleBase, out errorMessage);
+            }
+            catch (Exception ex)
+            {
+                errorMessage = $"Unexpected error resolving module base: {ex.Message}";
                 return false;
             }
-
-            return ErasePEHeader(processId, moduleBase, out errorMessage);
         }
 
         /// <summary>
@@ -115,26 +170,35 @@ namespace ExtremeInjector.Core
                 return false;
             }
 
-            IntPtr hProcess = NativeMethods.OpenProcess(
-                NativeMethods.PROCESS_VM_OPERATION | NativeMethods.PROCESS_VM_WRITE | NativeMethods.PROCESS_VM_READ,
-                false,
-                processId
-            );
-
-            if (hProcess == IntPtr.Zero)
-            {
-                int err = Marshal.GetLastWin32Error();
-                errorMessage = $"Failed to open process for Erase PE.\nWin32 Error {err}: {new Win32Exception(err).Message}";
-                return false;
-            }
-
+            IntPtr hProcess = IntPtr.Zero;
             try
             {
+                hProcess = NativeMethods.OpenProcess(
+                    NativeMethods.PROCESS_VM_OPERATION | NativeMethods.PROCESS_VM_WRITE | NativeMethods.PROCESS_VM_READ,
+                    false,
+                    processId
+                );
+
+                if (hProcess == IntPtr.Zero)
+                {
+                    int err = Marshal.GetLastWin32Error();
+                    errorMessage = $"Failed to open process for Erase PE (PID: {processId}).\nWin32 Error {err}: {new Win32Exception(err).Message}";
+                    return false;
+                }
+
                 return ErasePEHeader(hProcess, moduleBase, out errorMessage);
+            }
+            catch (Exception ex)
+            {
+                errorMessage = $"Unexpected error opening process for Erase PE: {ex.Message}";
+                return false;
             }
             finally
             {
-                NativeMethods.CloseHandle(hProcess);
+                if (hProcess != IntPtr.Zero)
+                {
+                    NativeMethods.CloseHandle(hProcess);
+                }
             }
         }
 
@@ -144,48 +208,68 @@ namespace ExtremeInjector.Core
         public static bool ErasePEHeader(IntPtr hProcess, IntPtr moduleBase, out string errorMessage)
         {
             errorMessage = "";
-            const uint HEADER_PAGE_SIZE = 0x1000; // 4096 bytes (standard PE header page)
+            const uint HEADER_PAGE_SIZE = 0x1000; // 4096 bytes (standard PE header page size)
 
-            // 1. Change memory protection of the header page to PAGE_READWRITE
-            if (!NativeMethods.VirtualProtectEx(
-                hProcess,
-                moduleBase,
-                (UIntPtr)HEADER_PAGE_SIZE,
-                NativeMethods.PAGE_READWRITE,
-                out uint oldProtect))
+            if (hProcess == IntPtr.Zero)
             {
-                int err = Marshal.GetLastWin32Error();
-                errorMessage = $"VirtualProtectEx (PAGE_READWRITE) failed.\nWin32 Error {err}: {new Win32Exception(err).Message}";
+                errorMessage = "Target process handle is invalid (NULL).";
                 return false;
             }
 
-            // 2. Zero-fill the entire 0x1000 header page
-            byte[] zeroBuffer = new byte[HEADER_PAGE_SIZE];
-            if (!NativeMethods.WriteProcessMemory(
-                hProcess,
-                moduleBase,
-                zeroBuffer,
-                (UIntPtr)HEADER_PAGE_SIZE,
-                out _))
+            if (moduleBase == IntPtr.Zero)
             {
-                int err = Marshal.GetLastWin32Error();
-                errorMessage = $"WriteProcessMemory failed to zero PE header.\nWin32 Error {err}: {new Win32Exception(err).Message}";
-
-                // Attempt to restore original protection on failure
-                NativeMethods.VirtualProtectEx(hProcess, moduleBase, (UIntPtr)HEADER_PAGE_SIZE, oldProtect, out _);
+                errorMessage = "Module base address is NULL.";
                 return false;
             }
 
-            // 3. Restore original memory protection
-            NativeMethods.VirtualProtectEx(
-                hProcess,
-                moduleBase,
-                (UIntPtr)HEADER_PAGE_SIZE,
-                oldProtect,
-                out _
-            );
+            try
+            {
+                // 1. Change memory protection of the header page to PAGE_READWRITE
+                if (!NativeMethods.VirtualProtectEx(
+                    hProcess,
+                    moduleBase,
+                    (UIntPtr)HEADER_PAGE_SIZE,
+                    NativeMethods.PAGE_READWRITE,
+                    out uint oldProtect))
+                {
+                    int err = Marshal.GetLastWin32Error();
+                    errorMessage = $"VirtualProtectEx (PAGE_READWRITE) failed at 0x{moduleBase.ToInt64():X}.\nWin32 Error {err}: {new Win32Exception(err).Message}";
+                    return false;
+                }
 
-            return true;
+                // 2. Zero-fill the entire 0x1000 header page
+                byte[] zeroBuffer = new byte[HEADER_PAGE_SIZE];
+                if (!NativeMethods.WriteProcessMemory(
+                    hProcess,
+                    moduleBase,
+                    zeroBuffer,
+                    (UIntPtr)HEADER_PAGE_SIZE,
+                    out _))
+                {
+                    int err = Marshal.GetLastWin32Error();
+                    errorMessage = $"WriteProcessMemory failed to zero PE header at 0x{moduleBase.ToInt64():X}.\nWin32 Error {err}: {new Win32Exception(err).Message}";
+
+                    // Attempt to restore original protection on failure
+                    NativeMethods.VirtualProtectEx(hProcess, moduleBase, (UIntPtr)HEADER_PAGE_SIZE, oldProtect, out _);
+                    return false;
+                }
+
+                // 3. Restore original memory protection
+                NativeMethods.VirtualProtectEx(
+                    hProcess,
+                    moduleBase,
+                    (UIntPtr)HEADER_PAGE_SIZE,
+                    oldProtect,
+                    out _
+                );
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                errorMessage = $"Unexpected exception during Erase PE: {ex.Message}";
+                return false;
+            }
         }
     }
 }
