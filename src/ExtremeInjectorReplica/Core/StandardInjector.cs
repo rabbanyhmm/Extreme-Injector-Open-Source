@@ -91,42 +91,21 @@ namespace ExtremeInjector.Core
                     return false;
                 }
 
-                // 7. Create Remote Thread (apply CREATE_SUSPENDED if HideFromDebugger is enabled)
+                // 7. Create Remote Thread (Supporting Stealth Inject & HideFromDebugger)
+                bool stealthInject = options?.StealthInject ?? false;
                 bool hideFromDebugger = options?.Advanced?.HideFromDebugger ?? false;
-                uint creationFlags = hideFromDebugger ? NativeMethods.CREATE_SUSPENDED : 0;
 
-                hThread = NativeMethods.CreateRemoteThread(
+                if (!NativeMethods.CreateRemoteThreadSmart(
                     hProcess,
-                    IntPtr.Zero,
-                    UIntPtr.Zero,
                     loadLibraryAddr,
                     remoteMem,
-                    creationFlags,
-                    out uint threadId
-                );
-
-                if (hThread == IntPtr.Zero)
+                    stealthInject,
+                    hideFromDebugger,
+                    out hThread,
+                    out string threadError))
                 {
-                    int err = Marshal.GetLastWin32Error();
-                    errorMessage = $"CreateRemoteThread failed.\nWin32 Error {err}: {GetWin32ErrorMessage(err)}";
+                    errorMessage = threadError;
                     return false;
-                }
-
-                // Apply HideFromDebugger before execution
-                if (hideFromDebugger)
-                {
-                    try
-                    {
-                        NativeMethods.NtSetInformationThread(
-                            hThread,
-                            NativeMethods.ThreadHideFromDebugger,
-                            IntPtr.Zero,
-                            0
-                        );
-                    }
-                    catch { }
-
-                    NativeMethods.ResumeThread(hThread);
                 }
 
                 // 8. Wait for Thread Execution

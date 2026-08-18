@@ -171,6 +171,10 @@ namespace ExtremeInjector.Core
         [DllImport("kernel32.dll", SetLastError = true)]
         public static extern bool IsWow64Process(IntPtr hProcess, out bool wow64Process);
 
+        public const uint THREAD_CREATE_FLAGS_CREATE_SUSPENDED = 0x00000001;
+        public const uint THREAD_CREATE_FLAGS_SKIP_THREAD_ATTACH = 0x00000002;
+        public const uint THREAD_CREATE_FLAGS_HIDE_FROM_DEBUGGER = 0x00000004;
+
         // NTAPI definitions for LdrLoadDll and NtCreateThreadEx
         [DllImport("ntdll.dll", SetLastError = true)]
         public static extern int NtCreateThreadEx(
@@ -180,10 +184,10 @@ namespace ExtremeInjector.Core
             IntPtr processHandle,
             IntPtr startAddress,
             IntPtr parameter,
-            bool createSuspended,
-            uint stackZeroBits,
-            uint sizeOfStackCommit,
-            uint sizeOfStackReserve,
+            uint createFlags,
+            UIntPtr stackZeroBits,
+            UIntPtr sizeOfStackCommit,
+            UIntPtr sizeOfStackReserve,
             IntPtr bytesBuffer
         );
 
@@ -211,5 +215,98 @@ namespace ExtremeInjector.Core
             uint threadInformationLength,
             out uint returnLength
         );
+
+        /// <summary>
+        /// Creates a remote thread supporting Stealth Inject (SKIP_THREAD_ATTACH) and HideFromDebugger with automatic fallback.
+        /// </summary>
+        public static bool CreateRemoteThreadSmart(
+            IntPtr hProcess,
+            IntPtr startAddress,
+            IntPtr parameter,
+            bool stealthInject,
+            bool hideFromDebugger,
+            out IntPtr hThread,
+            out string errorMessage)
+        {
+            hThread = IntPtr.Zero;
+            errorMessage = "";
+
+            // Method 1: Direct NtCreateThreadEx with Stealth & Anti-Debug Flags
+            if (stealthInject || hideFromDebugger)
+            {
+                uint ntCreateFlags = 0;
+                if (stealthInject)
+                {
+                    ntCreateFlags |= THREAD_CREATE_FLAGS_SKIP_THREAD_ATTACH;
+                }
+                if (hideFromDebugger)
+                {
+                    ntCreateFlags |= THREAD_CREATE_FLAGS_HIDE_FROM_DEBUGGER;
+                }
+
+                try
+                {
+                    int status = NtCreateThreadEx(
+                        out hThread,
+                        0x1FFFFF /* THREAD_ALL_ACCESS */,
+                        IntPtr.Zero,
+                        hProcess,
+                        startAddress,
+                        parameter,
+                        ntCreateFlags,
+                        UIntPtr.Zero,
+                        UIntPtr.Zero,
+                        UIntPtr.Zero,
+                        IntPtr.Zero
+                    );
+
+                    if (status == 0 && hThread != IntPtr.Zero)
+                    {
+                        return true;
+                    }
+                }
+                catch
+                {
+                    // Fall through to Win32 CreateRemoteThread
+                }
+            }
+
+            // Method 2: Standard Win32 CreateRemoteThread with optional Suspended + NtSetInformationThread
+            uint win32Flags = hideFromDebugger ? CREATE_SUSPENDED : 0;
+            hThread = CreateRemoteThread(
+                hProcess,
+                IntPtr.Zero,
+                UIntPtr.Zero,
+                startAddress,
+                parameter,
+                win32Flags,
+                out _
+            );
+
+            if (hThread == IntPtr.Zero)
+            {
+                int err = Marshal.GetLastWin32Error();
+                errorMessage = $"Failed to create remote thread.\nWin32 Error {err}: {new System.ComponentModel.Win32Exception(err).Message}";
+                return false;
+            }
+
+            if (hideFromDebugger)
+            {
+                try
+                {
+                    NtSetInformationThread(
+                        hThread,
+                        ThreadHideFromDebugger,
+                        IntPtr.Zero,
+                        0
+                    );
+                }
+                catch { }
+
+                ResumeThread(hThread);
+            }
+
+            return true;
+        }
     }
 }
