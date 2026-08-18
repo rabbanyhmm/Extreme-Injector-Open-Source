@@ -28,6 +28,7 @@ namespace ExtremeInjector.Core
             IntPtr remoteLoaderMem = IntPtr.Zero;
             IntPtr hThread = IntPtr.Zero;
             bool shouldFreeLoader = true;
+            bool injectionSucceeded = false;
 
             if (!File.Exists(dllPath))
             {
@@ -242,9 +243,21 @@ namespace ExtremeInjector.Core
 
                 if (hMod == 0)
                 {
-                    errorMessage = "Manual Map bootstrap failed (returned NULL module handle). Check dependency DLLs and architecture.";
+                    errorMessage = "Manual Map failed: Module initialization returned NULL. Check if the DLL has missing dependencies or if DllMain returned FALSE.";
                     return false;
                 }
+                if (hMod == 0x404040)
+                {
+                    errorMessage = "Manual Map failed: Null bootstrap data pointer received inside target thread.";
+                    return false;
+                }
+                if (hMod == 0x505050)
+                {
+                    errorMessage = "Manual Map failed: RtlAddFunctionTable failed to register x64 exception unwinding table.";
+                    return false;
+                }
+
+                injectionSucceeded = true;
 
                 // 14. Apply Post-Processing: Erase PE Header if requested
                 if (options?.ErasePE ?? false)
@@ -264,9 +277,13 @@ namespace ExtremeInjector.Core
                 if (hThread != IntPtr.Zero)
                     NativeMethods.CloseHandle(hThread);
 
-                // Free temporary shellcode loader memory (remoteImageBase stays resident!)
+                // Free temporary shellcode loader memory
                 if (shouldFreeLoader && remoteLoaderMem != IntPtr.Zero && hProcess != IntPtr.Zero)
                     NativeMethods.VirtualFreeEx(hProcess, remoteLoaderMem, UIntPtr.Zero, NativeMethods.MEM_RELEASE);
+
+                // If injection failed before thread started or on error, free mapped image to prevent memory leaks
+                if (!injectionSucceeded && shouldFreeLoader && remoteImageBase != IntPtr.Zero && hProcess != IntPtr.Zero)
+                    NativeMethods.VirtualFreeEx(hProcess, remoteImageBase, UIntPtr.Zero, NativeMethods.MEM_RELEASE);
 
                 if (hProcess != IntPtr.Zero)
                     NativeMethods.CloseHandle(hProcess);
