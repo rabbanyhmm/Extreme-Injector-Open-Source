@@ -65,16 +65,12 @@ namespace ExtremeInjector.UI
             picAppIcon = new PictureBox
             {
                 Location = new Point(12, 14),
-                Size = new Size(20, 20),
-                SizeMode = PictureBoxSizeMode.CenterImage,
+                Size = new Size(36, 36),
+                SizeMode = PictureBoxSizeMode.StretchImage,
                 BackColor = Color.Transparent,
+                Visible = false,
                 Cursor = Cursors.Hand
             };
-            try
-            {
-                picAppIcon.Image = new Icon(ThemeManager.AppIcon, new Size(20, 20)).ToBitmap();
-            }
-            catch { }
             picAppIcon.Click += PicAppIcon_Click;
 
             // 2. Process Selection Controls
