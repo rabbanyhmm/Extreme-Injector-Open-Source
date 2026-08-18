@@ -53,6 +53,9 @@ namespace ExtremeInjector.Core
                     case 3: // LdrpLoadDll Stub
                         injected = LdrLoadDllInjector.Inject(pid, dll, options, out err);
                         break;
+                    case 4: // Manual Map
+                        injected = ManualMapInjector.Inject(pid, dll, options, out err);
+                        break;
                 }
 
                 if (injected)
