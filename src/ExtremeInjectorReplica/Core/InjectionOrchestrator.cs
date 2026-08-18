@@ -45,12 +45,13 @@ namespace ExtremeInjector.Core
 
                 switch (options.Method)
                 {
-                    case 0: // Standard
-                    case 1: // LdrLoadDll
-                    case 2: // Thread Hijacking
-                    case 3: // Manual Map
+                    case 0: // Standard Injection
                     default:
                         injected = StandardInjector.Inject(pid, dll, options, out err);
+                        break;
+                    case 2: // LdrLoadDll Stub
+                    case 3: // LdrpLoadDll Stub
+                        injected = LdrLoadDllInjector.Inject(pid, dll, options, out err);
                         break;
                 }
 
