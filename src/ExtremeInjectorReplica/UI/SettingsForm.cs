@@ -351,10 +351,87 @@ namespace ExtremeInjector.UI
 
         private void CmbScramble_SelectedIndexChanged(object? sender, EventArgs e)
         {
-            string selected = cmbScramble.Text.Trim();
-            // Gray when "None" or "Custom", usable otherwise
-            bool isUsable = selected != "None" && selected != "Custom";
-            btnScrambleDll.Enabled = isUsable;
+            int index = cmbScramble.SelectedIndex;
+            var sc = SettingsManager.Current.Options.Scramble;
+
+            switch (index)
+            {
+                case 0: // None
+                    btnAdvScramble.Enabled = false;
+                    btnScrambleDll.Enabled = false;
+                    SetScramblePresetNone(sc);
+                    break;
+                case 1: // Basic
+                    btnAdvScramble.Enabled = false;
+                    btnScrambleDll.Enabled = true;
+                    SetScramblePresetBasic(sc);
+                    break;
+                case 2: // Standard
+                    btnAdvScramble.Enabled = false;
+                    btnScrambleDll.Enabled = true;
+                    SetScramblePresetStandard(sc);
+                    break;
+                case 3: // Extreme
+                    btnAdvScramble.Enabled = false;
+                    btnScrambleDll.Enabled = true;
+                    SetScramblePresetExtreme(sc);
+                    break;
+                case 4: // Custom
+                    btnAdvScramble.Enabled = true;
+                    btnScrambleDll.Enabled = false;
+                    break;
+            }
+        }
+
+        private static void SetScramblePresetNone(ScrambleConfig sc)
+        {
+            sc.ScrambleHeaderFields = false;
+            sc.RemoveUselessData = false;
+            sc.InsertExtraSections = false;
+            sc.ShiftSectionData = false;
+            sc.ModifyAssemblyCode = false;
+            sc.RenameSections = false;
+            sc.ShiftSectionMemory = false;
+            sc.StripSectionCharacteristics = false;
+            sc.CreateNewEntryPoint = false;
+            sc.ModifyImportTable = false;
+            sc.RemoveDebugData = false;
+            sc.MoveRelocationTable = false;
+            sc.CreateFakeDebugDirectory = false;
+        }
+
+        private static void SetScramblePresetBasic(ScrambleConfig sc)
+        {
+            SetScramblePresetNone(sc);
+            sc.ScrambleHeaderFields = true;
+            sc.RemoveUselessData = true;
+            sc.StripSectionCharacteristics = true;
+            sc.RemoveDebugData = true;
+        }
+
+        private static void SetScramblePresetStandard(ScrambleConfig sc)
+        {
+            SetScramblePresetBasic(sc);
+            sc.RenameSections = true;
+            sc.ShiftSectionData = true;
+            sc.ModifyImportTable = true;
+        }
+
+        private static void SetScramblePresetExtreme(ScrambleConfig sc)
+        {
+            sc.ScrambleHeaderFields = true;
+            sc.RemoveUselessData = true;
+            sc.InsertExtraSections = true;
+            sc.ShiftSectionData = true;
+            sc.ModifyAssemblyCode = true;
+            sc.RenameSections = true;
+            sc.ShiftSectionMemory = true;
+            sc.StripSectionCharacteristics = true;
+            sc.CreateNewEntryPoint = true;
+            sc.ModifyImportTable = true;
+            sc.RemoveDebugData = true;
+            sc.MoveRelocationTable = true;
+            sc.CreateFakeDebugDirectory = true;
         }
 
         private void BtnScrambleDll_Click(object? sender, EventArgs e)
@@ -434,6 +511,47 @@ namespace ExtremeInjector.UI
         {
             var opt = SettingsManager.Current.Options;
             cmbMethod.SelectedIndex = Math.Max(0, Math.Min(opt.Method, 4));
+
+            // Determine Scramble preset from ScrambleConfig
+            var sc = opt.Scramble;
+            bool allFalse = !sc.ScrambleHeaderFields && !sc.RemoveUselessData && !sc.InsertExtraSections &&
+                            !sc.ShiftSectionData && !sc.ModifyAssemblyCode && !sc.RenameSections &&
+                            !sc.ShiftSectionMemory && !sc.StripSectionCharacteristics && !sc.CreateNewEntryPoint &&
+                            !sc.ModifyImportTable && !sc.RemoveDebugData && !sc.MoveRelocationTable &&
+                            !sc.CreateFakeDebugDirectory;
+
+            bool allTrue = sc.ScrambleHeaderFields && sc.RemoveUselessData && sc.InsertExtraSections &&
+                           sc.ShiftSectionData && sc.ModifyAssemblyCode && sc.RenameSections &&
+                           sc.ShiftSectionMemory && sc.StripSectionCharacteristics && sc.CreateNewEntryPoint &&
+                           sc.ModifyImportTable && sc.RemoveDebugData && sc.MoveRelocationTable &&
+                           sc.CreateFakeDebugDirectory;
+
+            if (allFalse)
+            {
+                cmbScramble.SelectedIndex = 0; // None
+            }
+            else if (allTrue)
+            {
+                cmbScramble.SelectedIndex = 3; // Extreme
+            }
+            else if (sc.ScrambleHeaderFields && sc.RemoveUselessData && sc.StripSectionCharacteristics && sc.RemoveDebugData &&
+                     !sc.RenameSections && !sc.ShiftSectionData && !sc.ModifyImportTable &&
+                     !sc.InsertExtraSections && !sc.ModifyAssemblyCode && !sc.ShiftSectionMemory &&
+                     !sc.CreateNewEntryPoint && !sc.MoveRelocationTable && !sc.CreateFakeDebugDirectory)
+            {
+                cmbScramble.SelectedIndex = 1; // Basic
+            }
+            else if (sc.ScrambleHeaderFields && sc.RemoveUselessData && sc.StripSectionCharacteristics && sc.RemoveDebugData &&
+                     sc.RenameSections && sc.ShiftSectionData && sc.ModifyImportTable &&
+                     !sc.InsertExtraSections && !sc.ModifyAssemblyCode && !sc.ShiftSectionMemory &&
+                     !sc.CreateNewEntryPoint && !sc.MoveRelocationTable && !sc.CreateFakeDebugDirectory)
+            {
+                cmbScramble.SelectedIndex = 2; // Standard
+            }
+            else
+            {
+                cmbScramble.SelectedIndex = 4; // Custom
+            }
 
             chkAutoInject.Checked = opt.AutoInject;
             chkCloseOnInject.Checked = opt.CloseOnInject;
