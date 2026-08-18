@@ -17,7 +17,8 @@ build/
 *.pdb
 *.dll.config
 
-## Reverse Engineering / Scratch Analysis Dumps
+## Excluded Scratch & Analysis Dumps
+exclude/
 Extreme.Injector.v3.7.3.-.by.master131/
 *.bin
 manifest.xml
