@@ -57,6 +57,12 @@ namespace ExtremeInjector.Core
                 if (injected)
                 {
                     successCount++;
+
+                    // Apply Post-Injection Options
+                    if (options.ErasePE)
+                    {
+                        PostProcessor.ErasePEHeader(pid, dll, out _);
+                    }
                 }
                 else
                 {
