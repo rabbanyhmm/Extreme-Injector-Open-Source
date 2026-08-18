@@ -1,4 +1,4 @@
-# Extreme Injector Replica — Full Implementation Plan & Settings Blueprint
+# Extreme Injector Replica — Master Implementation Plan & Roadmap
 
 > **Architecture:** Pure C# (.NET Framework 4.8 WinForms) · Single standalone `Extreme Injector v3.exe` · Only native dependency: `mscoree.dll` (built into Windows) · Zero external DLL drops to disk  
 > All low-level Win32/NTAPI calls executed via C# P/Invoke.
@@ -27,17 +27,15 @@
 
 ---
 
-## 2. Complete Settings & UI Controls Blueprint
-
-Every single control across all dialogs is cataloged below with its persistence and functional status:
+## 2. Complete Settings & UI Controls Status Matrix
 
 ### A. Main Settings Dialog (`SettingsForm`)
 
 | Category | UI Control | Control Type | XML Setting Key | Status | Description / Action |
 |---|---|---|---|---|---|
-| **Injection Method** | Method Selector | `ComboBox` (5 items) | `<Method>` | ⚠️ Partial | `0: Standard`, `1: Thread Hijacking`, `2: LdrLoadDll`, `3: LdrpLoadDll`, `4: Manual Map` |
+| **Injection Method** | Method Selector | `ComboBox` (5 items) | `<Method>` | ⚠️ Partial | `0: Standard (Done)`, `1: Thread Hijacking`, `2: LdrLoadDll`, `3: LdrpLoadDll`, `4: Manual Map` |
 | | Advanced Button | `Button` | — | ✅ Done | Opens `AdvancedInjectionSettingsForm` |
-| **Scrambling Options** | Preset Selector | `ComboBox` (5 items) | `<Scramble>` preset | ⚠️ Partial | `None`, `Basic`, `Standard`, `Extreme`, `Custom` presets |
+| **Scrambling Options** | Preset Selector | `ComboBox` (5 items) | `<Scramble>` preset | ✅ Done | `None`, `Basic`, `Standard`, `Extreme`, `Custom` presets fully wired |
 | | Advanced Button | `Button` | — | ✅ Done | Opens `AdvancedScrambleSettingsForm` |
 | **Injection Options** | Auto Inject | `CheckBox` | `<AutoInject>` | ✅ Done | 400ms polling watcher with PID deduplication & lifecycle cleanup |
 | | Close on inject | `CheckBox` | `<CloseOnInject>` | ✅ Done | Auto-closes application upon successful injection |
@@ -96,12 +94,13 @@ Below is the ordered implementation backlog arranged strictly from **simplest, e
 |---|---|---|---|---|---|
 | **1** | **Auto Inject Timer** | 🟢 Easy | Feature | 400ms background polling timer with PID deduplication & lifecycle cleanup | ✅ **Done** |
 | **2** | **Hide From Debugger** | 🟢 Easy | Advanced Option | `NtSetInformationThread(hThread, ThreadHideFromDebugger = 17)` on remote thread | ✅ **Done** |
-| **3** | **Erase PE Header** | 🟡 Moderate | Post-Processing | `VirtualProtectEx` + zero-fill 0x1000 bytes over remote `IMAGE_DOS_HEADER` & `IMAGE_NT_HEADERS` | ⏳ Up Next |
-| **4** | **Stealth Inject (`NtCreateThreadEx`)** | 🟡 Moderate | Injection Option | Call `NtCreateThreadEx` passing `THREAD_CREATE_FLAGS_SKIP_THREAD_ATTACH (0x0004)` flag | ⏳ Pending |
-| **5** | **LdrLoadDll Inject** | 🟡 Moderate | Injection Method | Allocate `UNICODE_STRING` + DLL path in remote process; execute `ntdll!LdrLoadDll` stub | ⏳ Pending |
-| **6** | **Hide Module (PEB LDR Unlink)** | 🟠 High | Post-Processing | Query PEB via `NtQueryInformationProcess`; walk `PEB_LDR_DATA` chains and unlink pointers | ⏳ Pending |
-| **7** | **Thread Hijacking Inject** | 🟠 High | Injection Method | Suspend thread → capture `CONTEXT` (`GetThreadContext`) → write shellcode → update `RIP`/`EIP` → resume | ⏳ Pending |
-| **8** | **PE Scrambler Engine (13 Options)** | 🔴 Complex | PE Scrambler | Implement `PeScrambler.cs` covering Header, Section, Directory, and Import table transformations | ⏳ Pending |
-| **9** | **Manual Map Inject** | 🔴 Complex | Injection Method | Pure C# in-memory PE loader: section allocation, relocation fixing, IAT resolution, `DllMain` stub | ⏳ Pending |
-| **10** | **Manual Map Advanced Options** | 🔴 Complex | Advanced Option | Manual import resolution via remote PEB walk and SEH/Exception directory registration | ⏳ Pending |
-| **11** | **Start in Secure Mode** | 🔴 Complex | Protection | Restrict process security descriptors & token ACLs to prevent unauthorized inspection | ⏳ Pending |
+| **3** | **Scramble Presets Wiring** | 🟢 Easy | Settings / UI | Automatically sync `None`, `Basic`, `Standard`, `Extreme`, `Custom` presets | ✅ **Done** |
+| **4** | **Erase PE Header** | 🟡 Moderate | Post-Processing | `VirtualProtectEx` + zero-fill 0x1000 bytes over remote `IMAGE_DOS_HEADER` & `IMAGE_NT_HEADERS` | ⏳ **Up Next** |
+| **5** | **Stealth Inject (`NtCreateThreadEx`)** | 🟡 Moderate | Injection Option | Call `NtCreateThreadEx` passing `THREAD_CREATE_FLAGS_SKIP_THREAD_ATTACH (0x0004)` flag | ⏳ Pending |
+| **6** | **LdrLoadDll Inject** | 🟡 Moderate | Injection Method | Allocate `UNICODE_STRING` + DLL path in remote process; execute `ntdll!LdrLoadDll` stub | ⏳ Pending |
+| **7** | **Hide Module (PEB LDR Unlink)** | 🟠 High | Post-Processing | Query PEB via `NtQueryInformationProcess`; walk `PEB_LDR_DATA` chains and unlink pointers | ⏳ Pending |
+| **8** | **Thread Hijacking Inject** | 🟠 High | Injection Method | Suspend thread → capture `CONTEXT` (`GetThreadContext`) → write shellcode → update `RIP`/`EIP` → resume | ⏳ Pending |
+| **9** | **PE Scrambler Engine (13 Options)** | 🔴 Complex | PE Scrambler | Implement `PeScrambler.cs` covering Header, Section, Directory, and Import table transformations | ⏳ Pending |
+| **10** | **Manual Map Inject** | 🔴 Complex | Injection Method | Pure C# in-memory PE loader: section allocation, relocation fixing, IAT resolution, `DllMain` stub | ⏳ Pending |
+| **11** | **Manual Map Advanced Options** | 🔴 Complex | Advanced Option | Manual import resolution via remote PEB walk and SEH/Exception directory registration | ⏳ Pending |
+| **12** | **Start in Secure Mode** | 🔴 Complex | Protection | Restrict process security descriptors & token ACLs to prevent unauthorized inspection | ⏳ Pending |
