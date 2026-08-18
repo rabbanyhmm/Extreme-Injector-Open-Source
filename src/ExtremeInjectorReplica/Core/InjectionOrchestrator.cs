@@ -50,7 +50,7 @@ namespace ExtremeInjector.Core
                     case 2: // Thread Hijacking
                     case 3: // Manual Map
                     default:
-                        injected = StandardInjector.Inject(pid, dll, out err);
+                        injected = StandardInjector.Inject(pid, dll, options, out err);
                         break;
                 }
 

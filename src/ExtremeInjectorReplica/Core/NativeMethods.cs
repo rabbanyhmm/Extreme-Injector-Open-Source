@@ -164,6 +164,17 @@ namespace ExtremeInjector.Core
         [DllImport("ntdll.dll", SetLastError = true)]
         public static extern void RtlInitUnicodeString(ref UNICODE_STRING DestinationString, [MarshalAs(UnmanagedType.LPWStr)] string SourceString);
 
+        public const uint CREATE_SUSPENDED = 0x00000004;
+        public const uint ThreadHideFromDebugger = 17;
+
+        [DllImport("ntdll.dll", SetLastError = true)]
+        public static extern int NtSetInformationThread(
+            IntPtr threadHandle,
+            uint threadInformationClass,
+            IntPtr threadInformation,
+            uint threadInformationLength
+        );
+
         public const uint ThreadQuerySetWin32StartAddress = 9;
 
         [DllImport("ntdll.dll", SetLastError = true)]

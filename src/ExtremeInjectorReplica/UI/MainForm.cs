@@ -9,6 +9,7 @@ using System.Text;
 using System.Windows.Forms;
 using System.Windows.Forms.VisualStyles;
 using ExtremeInjector.Config;
+using ExtremeInjector.Core;
 
 namespace ExtremeInjector.UI
 {
@@ -40,6 +41,10 @@ namespace ExtremeInjector.UI
         private CustomTitleBar titleBar = null!;
         private Panel pnlContent = null!;
         private Panel pnlBottomButtons = null!;
+
+        private System.Windows.Forms.Timer _autoInjectTimer = null!;
+        private readonly HashSet<int> _autoInjectedPids = new();
+        private bool _isAutoInjecting = false;
 
         public MainForm()
         {
@@ -325,6 +330,9 @@ namespace ExtremeInjector.UI
             {
                 Height = 24
             };
+
+            _autoInjectTimer = new System.Windows.Forms.Timer { Interval = 400 };
+            _autoInjectTimer.Tick += AutoInjectTimer_Tick;
 
             Controls.AddRange(new Control[] {
                 pnlContent,
@@ -621,6 +629,64 @@ namespace ExtremeInjector.UI
 
         [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
         private struct RECT { public int Left, Top, Right, Bottom; }
+
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            _autoInjectTimer?.Stop();
+            base.OnFormClosing(e);
+        }
+
+        private async void AutoInjectTimer_Tick(object? sender, EventArgs e)
+        {
+            if (_isAutoInjecting) return;
+            if (!SettingsManager.Current.Options.AutoInject) return;
+
+            string procName = txtProcess.Text.Trim();
+            if (string.IsNullOrEmpty(procName)) return;
+
+            var enabledDlls = lstDlls.Items.Cast<ListViewItem>()
+                .Where(i => i.Checked && i.Tag is ModuleItem)
+                .Select(i => ((ModuleItem)i.Tag!).Path)
+                .ToList();
+
+            if (enabledDlls.Count == 0) return;
+
+            try
+            {
+                string simpleName = Path.GetFileNameWithoutExtension(procName);
+                var runningProcs = Process.GetProcessesByName(simpleName);
+
+                // Prune terminated PIDs from the set
+                var runningPidSet = new HashSet<int>(runningProcs.Select(p => p.Id));
+                _autoInjectedPids.RemoveWhere(pid => !runningPidSet.Contains(pid));
+
+                var targetProc = runningProcs.FirstOrDefault(p => PrivilegeManager.CanQueryProcess(p.Id) && !_autoInjectedPids.Contains(p.Id));
+                if (targetProc != null)
+                {
+                    _isAutoInjecting = true;
+                    int targetPid = targetProc.Id;
+                    _autoInjectedPids.Add(targetPid);
+
+                    var result = await InjectionOrchestrator.ExecuteInjectionAsync(procName, enabledDlls, SettingsManager.Current.Options);
+
+                    _isAutoInjecting = false;
+
+                    if (result.Success)
+                    {
+                        MessageBox.Show("Injection has completed successfully!", "Extreme Injector v3", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+                        if (SettingsManager.Current.Options.CloseOnInject)
+                        {
+                            Close();
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                _isAutoInjecting = false;
+            }
+        }
         #endregion
 
         private void UpdateInjectButtonState()
@@ -648,6 +714,16 @@ namespace ExtremeInjector.UI
 
             UpdateProcessDetails();
             UpdateInjectButtonState();
+
+            if (cfg.Options.AutoInject)
+            {
+                _autoInjectTimer.Start();
+            }
+            else
+            {
+                _autoInjectTimer.Stop();
+            }
+
             Invalidate();
         }
 

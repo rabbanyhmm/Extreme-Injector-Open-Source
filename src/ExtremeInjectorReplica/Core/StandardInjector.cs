@@ -3,12 +3,13 @@ using System.ComponentModel;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
+using ExtremeInjector.Config;
 
 namespace ExtremeInjector.Core
 {
     public static class StandardInjector
     {
-        public static bool Inject(int processId, string dllPath, out string errorMessage)
+        public static bool Inject(int processId, string dllPath, OptionsConfig? options, out string errorMessage)
         {
             errorMessage = "";
             IntPtr hProcess = IntPtr.Zero;
@@ -90,14 +91,17 @@ namespace ExtremeInjector.Core
                     return false;
                 }
 
-                // 7. Create Remote Thread to Execute LoadLibraryW
+                // 7. Create Remote Thread (apply CREATE_SUSPENDED if HideFromDebugger is enabled)
+                bool hideFromDebugger = options?.Advanced?.HideFromDebugger ?? false;
+                uint creationFlags = hideFromDebugger ? NativeMethods.CREATE_SUSPENDED : 0;
+
                 hThread = NativeMethods.CreateRemoteThread(
                     hProcess,
                     IntPtr.Zero,
                     UIntPtr.Zero,
                     loadLibraryAddr,
                     remoteMem,
-                    0,
+                    creationFlags,
                     out uint threadId
                 );
 
@@ -106,6 +110,23 @@ namespace ExtremeInjector.Core
                     int err = Marshal.GetLastWin32Error();
                     errorMessage = $"CreateRemoteThread failed.\nWin32 Error {err}: {GetWin32ErrorMessage(err)}";
                     return false;
+                }
+
+                // Apply HideFromDebugger before execution
+                if (hideFromDebugger)
+                {
+                    try
+                    {
+                        NativeMethods.NtSetInformationThread(
+                            hThread,
+                            NativeMethods.ThreadHideFromDebugger,
+                            IntPtr.Zero,
+                            0
+                        );
+                    }
+                    catch { }
+
+                    NativeMethods.ResumeThread(hThread);
                 }
 
                 // 8. Wait for Thread Execution

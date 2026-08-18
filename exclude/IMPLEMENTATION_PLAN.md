@@ -58,12 +58,12 @@
 | 21 | Close on Inject | ✅ Done | Option | `Close()` after successful injection |
 | 22 | Inject Delay (Initial delay ms) | ✅ Done | Option | `Task.Delay(options.Delay)` |
 | 23 | Delay Between (Per-DLL delay ms) | ✅ Done | Option | `Task.Delay(options.DelayBetween)` |
-| 24 | Auto Inject (On process spawn) | ⚠️ Partial | Option | UI setting exists; background polling timer needed |
+| 24 | Auto Inject (On process spawn) | ✅ Done | Option | Real-time polling with PID deduplication & lifecycle management |
 | 25 | Stealth Inject (NtCreateThreadEx) | ❌ Not Done | Option | Suppress `DLL_THREAD_ATTACH` callbacks via NTAPI |
 | **POST-INJECTION & PROTECTION** | | | | |
 | 26 | Erase PE Header | ❌ Not Done | Post-Processing | `VirtualProtectEx` + zero-fill remote PE header |
 | 27 | Hide Module (PEB LDR Unlink) | ❌ Not Done | Post-Processing | Unlink `LDR_DATA_TABLE_ENTRY` from remote PEB |
-| 28 | Hide From Debugger | ❌ Not Done | Advanced Option | `NtSetInformationThread(ThreadHideFromDebugger)` |
+| 28 | Hide From Debugger | ✅ Done | Advanced Option | `NtSetInformationThread(ThreadHideFromDebugger = 17)` on remote thread |
 | 29 | Start in Secure Mode | ❌ Not Done | Protection | Self-protection & process access ACL modification |
 | **SCRAMBLE ENGINE & ADVANCED** | | | | |
 | 30 | All Scramble Checkboxes Default to TRUE | ✅ Done | Config | `ScrambleConfig` defaults all set to true |
