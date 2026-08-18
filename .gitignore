@@ -19,12 +19,6 @@ build/
 
 ## Excluded Scratch & Analysis Dumps
 exclude/
-Extreme.Injector.v3.7.3.-.by.master131/
-*.bin
-manifest.xml
-settings.xml
-icon_*.ico
-app_icon.png
 
 ## OS generated
 Thumbs.db
