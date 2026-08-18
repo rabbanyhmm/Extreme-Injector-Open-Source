@@ -46,6 +46,22 @@ namespace ExtremeInjector.UI
             SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
             InitializeComponent();
             ApplySettings();
+            ThemeManager.ThemeChanged += () =>
+            {
+                lblProcess.ForeColor = ThemeManager.TextColor;
+                lblProcessTitle.ForeColor = ThemeManager.TextColor;
+                lblProcessPid.ForeColor = ThemeManager.TextColor;
+                grpInjectList.ForeColor = ThemeManager.TextColor;
+                grpInjectList.BorderColor = Color.FromArgb(
+                    Math.Max(0, ThemeManager.Background1.R - 40),
+                    Math.Max(0, ThemeManager.Background1.G - 40),
+                    Math.Max(0, ThemeManager.Background1.B - 40)
+                );
+                Invalidate(true);
+                titleBar?.Invalidate();
+                pnlContent?.Invalidate();
+                grpInjectList?.Invalidate();
+            };
             Activated += (s, e) => Invalidate();
             Deactivate += (s, e) => Invalidate();
         }
@@ -802,7 +818,7 @@ namespace ExtremeInjector.UI
             using var dlg = new SettingsForm();
             if (dlg.ShowDialog(this) == DialogResult.OK)
             {
-                Invalidate(true);
+                ApplySettings();
             }
         }
 

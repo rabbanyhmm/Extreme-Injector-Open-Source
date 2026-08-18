@@ -12,6 +12,8 @@ namespace ExtremeInjector.UI
         public static Color Background2 { get; set; } = Color.FromArgb(0, 180, 255);
         public static Color TextColor { get; set; } = Color.White;
 
+        public static event Action? ThemeChanged;
+
         private static Icon? _appIcon;
         public static Icon AppIcon
         {
@@ -48,6 +50,7 @@ namespace ExtremeInjector.UI
             try { Background1 = ColorTranslator.FromHtml(bg1); } catch { Background1 = Color.FromArgb(0, 150, 255); }
             try { Background2 = ColorTranslator.FromHtml(bg2); } catch { Background2 = Color.FromArgb(0, 180, 255); }
             try { TextColor = ColorTranslator.FromHtml(text); } catch { TextColor = Color.White; }
+            ThemeChanged?.Invoke();
         }
 
         public static void DrawHeaderBanner(Graphics g, Rectangle bounds, string title, string subtitle = "")
