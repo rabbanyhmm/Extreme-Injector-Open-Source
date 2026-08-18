@@ -1,7 +1,12 @@
 <?xml version="1.0"?>
 <Settings xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <LastUpdateCheck>2026-08-18T03:06:09.6605607Z</LastUpdateCheck>
-  <Modules />
+  <Modules>
+    <Module>
+      <Enable>true</Enable>
+      <Path>C:\Users\mdrab\Downloads\ChamsMenu (1).dll</Path>
+    </Module>
+  </Modules>
   <Options>
     <Advanced>
       <DisableExceptionSupport>false</DisableExceptionSupport>
@@ -36,7 +41,7 @@
     <StealthInject>false</StealthInject>
     <TextColor>White</TextColor>
   </Options>
-  <ProcessName>Discord.exe</ProcessName>
+  <ProcessName>notepad.exe</ProcessName>
   <Warnings>
     <LdrpLoadDll>false</LdrpLoadDll>
     <ManualMap>false</ManualMap>

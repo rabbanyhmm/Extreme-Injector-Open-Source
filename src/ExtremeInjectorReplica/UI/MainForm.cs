@@ -849,7 +849,7 @@ namespace ExtremeInjector.UI
 
             if (result.Success)
             {
-                MessageBox.Show($"Successfully injected {result.InjectedCount} module(s) into {txtProcess.Text}!", "Extreme Injector", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show("Injection has completed successfully!", "Extreme Injector v3", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
                 if (SettingsManager.Current.Options.CloseOnInject)
                 {
