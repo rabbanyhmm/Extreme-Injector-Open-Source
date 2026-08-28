@@ -123,16 +123,10 @@ The output executable will be created at `src/ExtremeInjectorReplica/bin/Release
 
 <p align="center">
   <a href="https://github.com/rabbanyhmm">
-    <img src="https://images.weserv.nl/?url=github.com/rabbanyhmm.png&mask=circle&w=100&h=100" width="52" height="52" alt="rabbanyhmm" title="rabbanyhmm (Maintainer)">
+    <img src="https://wsrv.nl/?url=github.com/rabbanyhmm.png&mask=circle&bg=transparent" width="50" height="50" alt="rabbanyhmm" title="rabbanyhmm (Maintainer)">
   </a>
   <a href="https://github.com/ShlokBorad">
-    <img src="https://images.weserv.nl/?url=github.com/ShlokBorad.png&mask=circle&w=100&h=100" width="52" height="52" alt="ShlokBorad" title="ShlokBorad (Thread-Map Technique)">
-  </a>
-</p>
-
-<p align="center">
-  <a href="https://github.com/rabbanyhmm/Extreme-Injector-Open-Source/graphs/contributors">
-    <img src="https://contrib.rocks/image?repo=rabbanyhmm/Extreme-Injector-Open-Source" alt="Dynamic Repository Contributors" />
+    <img src="https://wsrv.nl/?url=github.com/ShlokBorad.png&mask=circle&bg=transparent" width="50" height="50" alt="ShlokBorad" title="ShlokBorad (Thread-Map Technique)">
   </a>
 </p>
 
@@ -140,7 +134,7 @@ The output executable will be created at `src/ExtremeInjectorReplica/bin/Release
 
 <p align="center">
   <a href="https://github.com/master131">
-    <img src="https://images.weserv.nl/?url=github.com/master131.png&mask=circle&w=100&h=100" width="60" height="60" alt="master131" title="master131 (Original UI & Concept Design)">
+    <img src="https://wsrv.nl/?url=github.com/master131.png&mask=circle&bg=transparent" width="58" height="58" alt="master131" title="master131 (Original UI & Concept Design)">
   </a>
 </p>
 
