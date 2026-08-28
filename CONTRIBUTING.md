@@ -1,64 +1,51 @@
-# Contributing to Extreme Injector
+# Contributing
 
-Thank you for your interest in contributing to **Extreme Injector (Open Source Replica)**! We welcome bug reports, feature requests, code contributions, and documentation improvements.
+Pull requests are welcome. If you're planning something big, open an issue first so we can talk about it.
 
 ---
 
-## 🛠️ Local Development Setup
+## Setup
 
-### Prerequisites
-- **Operating System:** Windows 10 or Windows 11 (x86 / x64)
-- **Development Tools:** 
-  - [.NET Framework 4.8 Developer Pack](https://dotnet.microsoft.com/download/dotnet-framework/net48) or Visual Studio 2019 / 2022 with *.NET Desktop Development* workload
+You need Windows. The project targets .NET Framework 4.8, so grab the [Developer Pack](https://dotnet.microsoft.com/download/dotnet-framework/net48) if you don't have it, or just use Visual Studio 2019/2022 with the .NET Desktop workload — it includes everything.
 
-### Getting the Code
-
-1. Fork the repository on GitHub.
-2. Clone your fork locally:
-   ```powershell
-   git clone https://github.com/YOUR-USERNAME/Extreme-Injector-Open-Source.git
-   cd Extreme-Injector-Open-Source
-   ```
-
-### Building the Project
-
-Run `dotnet build` from the command line:
+Fork the repo, clone it:
 
 ```powershell
-# Build in Release configuration
+git clone https://github.com/YOUR-USERNAME/Extreme-Injector-Open-Source.git
+cd Extreme-Injector-Open-Source
+```
+
+Build:
+
+```powershell
 dotnet build ./src/ExtremeInjectorReplica/ExtremeInjectorReplica.csproj -c Release
 ```
 
-The output executable will be compiled to:
-`src/ExtremeInjectorReplica/bin/Release/net48/Extreme Injector v3.exe`
+Output ends up at `src/ExtremeInjectorReplica/bin/Release/net48/Extreme Injector v3.exe`.
 
 ---
 
-## 📝 Guidelines & Code Style
+## A few things to keep in mind
 
-- **C# Formatting:** Follow standard C# naming conventions (PascalCase for methods/classes, camelCase for parameters/local variables).
-- **Zero External Dependencies:** Keep the application standalone — do not add third-party DLL dependencies unless discussed first.
-- **P/Invoke & Native Methods:** Place Win32/NTAPI P/Invoke signatures inside `Core/NativeMethods.cs`.
-- **UI & Themes:** Place UI controls and WinForms dialogs under `UI/`.
-
----
-
-## 🚀 Submitting a Pull Request
-
-1. Create a feature branch:
-   ```powershell
-   git checkout -b feature/my-new-feature
-   ```
-2. Commit your changes with clear, human-readable commit messages.
-3. Push to your fork:
-   ```powershell
-   git push origin feature/my-new-feature
-   ```
-4. Open a **Pull Request** against the `main` branch. GitHub Actions will automatically verify that your code compiles cleanly!
+- Keep it standalone. No third-party DLL dependencies without discussion.
+- P/Invoke declarations go in `Core/NativeMethods.cs`.
+- UI dialogs and controls go under `UI/`.
+- Standard C# naming: PascalCase for classes and methods, camelCase for locals.
 
 ---
 
-## 🐛 Reporting Bugs & Suggesting Features
+## Submitting a PR
 
-- Open an issue using the provided **Bug Report** or **Feature Request** template.
-- Provide step-by-step reproduction instructions and Windows OS version details for bug reports.
+Branch off `main`, do your thing, push, open a PR. GitHub Actions will build it automatically and flag any compile errors.
+
+```powershell
+git checkout -b my-feature
+# ...make changes...
+git push origin my-feature
+```
+
+---
+
+## Bugs & Feature Requests
+
+Use the issue templates. For bugs, include your Windows version and the exact steps to reproduce.
