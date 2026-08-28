@@ -1,10 +1,6 @@
 # Extreme Injector v3 (Open Source)
 
 <p align="center">
-  <img src="assets/ExtremeInjector.png" alt="Extreme Injector Main UI" width="480">
-</p>
-
-<p align="center">
   <a href="https://dotnet.microsoft.com/"><img src="https://img.shields.io/badge/.NET%20Framework-4.8-512BD4?logo=dotnet" alt=".NET Framework 4.8"></a>
   <a href="https://microsoft.com/windows"><img src="https://img.shields.io/badge/Platform-Windows%20(x86%20%2F%20x64)-0078D6?logo=windows" alt="Platform"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License"></a>
@@ -134,11 +130,11 @@ The output executable will be created at `src/ExtremeInjectorReplica/bin/Release
   </a>
 </p>
 
-<h3 align="center">Original Creator</h3>
+<h3 align="center">Original UI & Concept Design</h3>
 
 <p align="center">
   <a href="https://github.com/master131">
-    <img src="https://github.com/master131.png?size=100" width="64" height="64" alt="master131" title="master131 (Original Creator of Extreme Injector)" style="border-radius:50%; margin: 4px;">
+    <img src="https://github.com/master131.png?size=100" width="64" height="64" alt="master131" title="master131 (Original UI & Concept Design)" style="border-radius:50%; margin: 4px;">
   </a>
 </p>
 
