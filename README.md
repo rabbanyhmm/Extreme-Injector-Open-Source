@@ -139,7 +139,7 @@ The output executable will be created at `src/ExtremeInjectorReplica/bin/Release
   </a>
   &nbsp;&nbsp;
   <a href="https://github.com/arghadeeplaskar">
-    <img src="https://wsrv.nl/?url=github.com/arghadeeplaskar.png&w=100&h=100&mask=circle&output=png" width="55" height="55" alt="arghadeeplaskar" title="arghadeeplaskar">
+    <img src="https://wsrv.nl/?url=github.com/arghadeeplaskar.png&w=100&h=100&mask=circle&output=png" width="55" height="55" alt="arghadeeplaskar" title="arghadeeplaskar (Manual Mapping)">
   </a>
 </p>
 
