@@ -64,22 +64,37 @@ namespace ExtremeInjector.Core
 
         /// <summary>
         /// Attempts to open a target process with desired access.
-        /// If direct OpenProcess fails (e.g., target is protected / access denied), automatically falls back to handle hijacking.
+        /// If direct OpenProcess fails or the returned handle lacks VM write access (protected process),
+        /// automatically falls back to handle hijacking via NtQuerySystemInformation.
         /// </summary>
         public static IntPtr OpenProcessSmart(int processId, uint desiredAccess, out bool wasHijacked)
         {
             wasHijacked = false;
 
-            // 1. Try standard OpenProcess first
+            // 1. Enable SeDebugPrivilege upfront — helps with both paths
+            PrivilegeManager.EnableAllSecurityPrivileges();
+
+            // 2. Try standard OpenProcess
             IntPtr hProcess = NativeMethods.OpenProcess(desiredAccess, false, processId);
             if (hProcess != IntPtr.Zero)
             {
-                return hProcess;
+                // Verify the handle actually has VM write access by probing with a small allocation.
+                // Some anti-cheat hooks let OpenProcess succeed but block VirtualAllocEx — same check
+                // the reference C++ injector does before trusting any handle.
+                IntPtr probe = NativeMethods.VirtualAllocEx(hProcess, IntPtr.Zero, (UIntPtr)0x1000,
+                    NativeMethods.MEM_COMMIT | NativeMethods.MEM_RESERVE, NativeMethods.PAGE_READWRITE);
+                if (probe != IntPtr.Zero)
+                {
+                    NativeMethods.VirtualFreeEx(hProcess, probe, UIntPtr.Zero, NativeMethods.MEM_RELEASE);
+                    return hProcess; // Direct handle is fully usable
+                }
+
+                // Handle is present but VM access is blocked — close it and fall through to hijack
+                NativeMethods.CloseHandle(hProcess);
+                hProcess = IntPtr.Zero;
             }
 
-            // 2. If direct OpenProcess fails, enable SeDebugPrivilege and fallback to Handle Hijacking
-            PrivilegeManager.EnableAllSecurityPrivileges();
-
+            // 3. Fallback: scan system handle table and duplicate a privileged handle
             hProcess = HijackHandle((uint)processId, desiredAccess);
             if (hProcess != IntPtr.Zero)
             {
