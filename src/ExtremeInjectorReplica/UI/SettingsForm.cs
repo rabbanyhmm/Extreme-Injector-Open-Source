@@ -278,10 +278,7 @@ namespace ExtremeInjector.UI
                 FlatStyle = FlatStyle.System,
                 UseVisualStyleBackColor = true
             };
-            btnStartSecureMode.Click += (s, e) =>
-            {
-                MessageBox.Show("Secure Mode initialized. Anti-tamper and randomized memory mapping enabled.", "Secure Mode", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            };
+            btnStartSecureMode.Click += BtnStartSecureMode_Click;
 
             grpTools.Controls.AddRange(new Control[] {
                 btnViewProcessInfo,
@@ -340,7 +337,8 @@ namespace ExtremeInjector.UI
                 using var cd = new ColorDialog
                 {
                     Color = pnl.BackColor,
-                    FullOpen = true
+                    FullOpen = false,
+                    AllowFullOpen = true
                 };
                 if (cd.ShowDialog(this) == DialogResult.OK)
                 {
@@ -512,9 +510,103 @@ namespace ExtremeInjector.UI
                 Filter = "Dynamic Link Library (*.dll)|*.dll|All Files (*.*)|*.*",
                 Title = "Select DLL to Scramble"
             };
+
             if (ofd.ShowDialog(this) == DialogResult.OK)
             {
-                MessageBox.Show($"DLL '{Path.GetFileName(ofd.FileName)}' successfully scrambled and saved.", "Scramble DLL", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                string originalPath = ofd.FileName;
+                string dir = Path.GetDirectoryName(originalPath) ?? "";
+                string fileNameNoExt = Path.GetFileNameWithoutExtension(originalPath);
+                string ext = Path.GetExtension(originalPath);
+
+                using var sfd = new SaveFileDialog
+                {
+                    Filter = "Dynamic Link Library (*.dll)|*.dll|All Files (*.*)|*.*",
+                    Title = "Save Scrambled DLL As",
+                    FileName = $"{fileNameNoExt}_scrambled{ext}",
+                    InitialDirectory = dir
+                };
+
+                if (sfd.ShowDialog(this) == DialogResult.OK)
+                {
+                    bool success = ExtremeInjector.Core.ScramblerEngine.ScrambleFile(
+                        originalPath,
+                        sfd.FileName,
+                        SettingsManager.Current.Options.Scramble,
+                        out string error
+                    );
+
+                    if (success)
+                    {
+                        MessageBox.Show(
+                            $"DLL '{Path.GetFileName(originalPath)}' successfully scrambled and saved to:\n\n{sfd.FileName}",
+                            "Scramble DLL",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Information
+                        );
+                    }
+                    else
+                    {
+                        MessageBox.Show(
+                            $"An error occurred while scrambling the DLL:\n\n{error}",
+                            "Scramble DLL",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Error
+                        );
+                    }
+                }
+            }
+        }
+
+        private void BtnStartSecureMode_Click(object? sender, EventArgs e)
+        {
+            try
+            {
+                string currentExePath = Application.ExecutablePath;
+                if (!File.Exists(currentExePath)) return;
+
+                byte[] exeBytes = File.ReadAllBytes(currentExePath);
+
+                // Generate random alphanumeric filename in %TEMP%
+                string randomName = $"EI_{Guid.NewGuid():N}.exe";
+                string tempDir = Path.GetTempPath();
+                string targetPath = Path.Combine(tempDir, randomName);
+
+                // Mutate binary signature with random overlay padding (16-64 bytes)
+                var rand = new Random();
+                int padCount = rand.Next(16, 64);
+                byte[] padBytes = new byte[padCount];
+                rand.NextBytes(padBytes);
+
+                byte[] mutatedBytes = new byte[exeBytes.Length + padCount];
+                Buffer.BlockCopy(exeBytes, 0, mutatedBytes, 0, exeBytes.Length);
+                Buffer.BlockCopy(padBytes, 0, mutatedBytes, exeBytes.Length, padCount);
+
+                File.WriteAllBytes(targetPath, mutatedBytes);
+
+                // Copy settings.xml if it exists so configuration carries over
+                string localSettings = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.xml");
+                string tempSettings = Path.Combine(tempDir, "settings.xml");
+                if (File.Exists(localSettings))
+                {
+                    try { File.Copy(localSettings, tempSettings, true); } catch { }
+                }
+
+                // Launch randomized clone process
+                var psi = new ProcessStartInfo
+                {
+                    FileName = targetPath,
+                    WorkingDirectory = tempDir,
+                    UseShellExecute = true
+                };
+
+                Process.Start(psi);
+
+                // Terminate current instance immediately
+                Environment.Exit(0);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to start in Secure Mode: {ex.Message}", "Secure Mode", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 

@@ -79,7 +79,16 @@ namespace ExtremeInjector.Core
             public ulong Rax, Rcx, Rdx, Rbx, Rsp, Rbp, Rsi, Rdi;
             public ulong R8, R9, R10, R11, R12, R13, R14, R15;
             public ulong Rip;
-            // Additional registers omitted for brevity
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 512)]
+            public byte[] FltSave;
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 512)]
+            public byte[] VectorRegister;
+            public ulong VectorControl;
+            public ulong DebugControl;
+            public ulong LastBranchToRip;
+            public ulong LastBranchFromRip;
+            public ulong LastExceptionToRip;
+            public ulong LastExceptionFromRip;
         }
 
         [DllImport("kernel32.dll", SetLastError = true)]
@@ -152,6 +161,18 @@ namespace ExtremeInjector.Core
 
         [DllImport("kernel32.dll", SetLastError = true)]
         public static extern bool SetThreadContext(IntPtr hThread, ref CONTEXT_X86 lpContext);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        public static extern bool GetThreadContext(IntPtr hThread, ref CONTEXT_X64 lpContext);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        public static extern bool SetThreadContext(IntPtr hThread, ref CONTEXT_X64 lpContext);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        public static extern bool Wow64GetThreadContext(IntPtr hThread, ref CONTEXT_X86 lpContext);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        public static extern bool Wow64SetThreadContext(IntPtr hThread, ref CONTEXT_X86 lpContext);
 
         [DllImport("kernel32.dll", SetLastError = true)]
         public static extern IntPtr CreateToolhelp32Snapshot(uint dwFlags, uint th32ProcessID);

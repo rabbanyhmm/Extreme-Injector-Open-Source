@@ -14,6 +14,7 @@ namespace ExtremeInjector.UI
         private ListView lstProcesses = null!;
         private Button btnProcessList = null!;
         private Button btnWindowList = null!;
+        private Button btnWindowPicker = null!;
         private Button btnSelect = null!;
         private Button btnClose = null!;
         private ImageList imgList = null!;
@@ -54,7 +55,7 @@ namespace ExtremeInjector.UI
         private void InitializeComponent()
         {
             Text = "Process List";
-            ClientSize = new Size(270, 278);
+            ClientSize = new Size(270, 306);
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
             MinimizeBox = false;
@@ -86,7 +87,7 @@ namespace ExtremeInjector.UI
             lstProcesses.Columns.Add("", 234);
             lstProcesses.DoubleClick += (s, e) => SelectAndClose();
 
-            // Bottom 2x2 Button Grid (Width = 125px each, Height = 24px each)
+            // Action Buttons
             btnProcessList = new Button
             {
                 Text = "Process List",
@@ -107,10 +108,30 @@ namespace ExtremeInjector.UI
             };
             btnWindowList.Click += (s, e) => RefreshList(true);
 
+            btnWindowPicker = new Button
+            {
+                Text = "Window Drag Picker 🎯",
+                Location = new Point(6, 246),
+                Size = new Size(258, 24),
+                FlatStyle = FlatStyle.System,
+                UseVisualStyleBackColor = true
+            };
+            btnWindowPicker.Click += (s, e) =>
+            {
+                using var wpf = new WindowPickerForm();
+                if (wpf.ShowDialog(this) == DialogResult.OK)
+                {
+                    SelectedProcessName = wpf.SelectedProcessName;
+                    SelectedProcessId = wpf.SelectedProcessId;
+                    DialogResult = DialogResult.OK;
+                    Close();
+                }
+            };
+
             btnSelect = new Button
             {
                 Text = "Select",
-                Location = new Point(6, 246),
+                Location = new Point(6, 274),
                 Size = new Size(125, 24),
                 FlatStyle = FlatStyle.System,
                 UseVisualStyleBackColor = true
@@ -120,7 +141,7 @@ namespace ExtremeInjector.UI
             btnClose = new Button
             {
                 Text = "Close",
-                Location = new Point(139, 246),
+                Location = new Point(139, 274),
                 Size = new Size(125, 24),
                 FlatStyle = FlatStyle.System,
                 UseVisualStyleBackColor = true
@@ -131,6 +152,7 @@ namespace ExtremeInjector.UI
                 lstProcesses,
                 btnProcessList,
                 btnWindowList,
+                btnWindowPicker,
                 btnSelect,
                 btnClose
             });

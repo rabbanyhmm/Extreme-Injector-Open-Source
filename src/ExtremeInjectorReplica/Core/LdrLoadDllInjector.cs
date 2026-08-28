@@ -38,11 +38,11 @@ namespace ExtremeInjector.Core
                                          NativeMethods.PROCESS_VM_WRITE |
                                          NativeMethods.PROCESS_VM_READ;
 
-            hProcess = NativeMethods.OpenProcess(PROCESS_ACCESS, false, processId);
+            hProcess = HandleHijacker.OpenProcessSmart(processId, PROCESS_ACCESS, out _);
             if (hProcess == IntPtr.Zero)
             {
                 int err = Marshal.GetLastWin32Error();
-                errorMessage = $"Failed to open target process (PID: {processId}).\nWin32 Error {err}: {new Win32Exception(err).Message}";
+                errorMessage = $"Failed to open or hijack handle to target process (PID: {processId}).\nWin32 Error {err}: {new Win32Exception(err).Message}";
                 return false;
             }
 

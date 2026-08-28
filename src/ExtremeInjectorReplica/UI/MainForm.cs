@@ -36,6 +36,7 @@ namespace ExtremeInjector.UI
         private ContextMenuStrip ctxMenu = null!;
         private int currentSelectedIndex = -1;
         private int currentSelectedPid = 0;
+        private bool isSortActive = false;
         private bool isSortAscending = true;
         private ListViewHeaderListener? headerListener;
         private CustomTitleBar titleBar = null!;
@@ -43,8 +44,11 @@ namespace ExtremeInjector.UI
         private Panel pnlBottomButtons = null!;
 
         private System.Windows.Forms.Timer _autoInjectTimer = null!;
+        private System.Windows.Forms.Timer _processWatcherTimer = null!;
         private readonly HashSet<int> _autoInjectedPids = new();
         private bool _isAutoInjecting = false;
+        private string _lastObservedProcessName = "";
+        private int _lastObservedPid = 0;
 
         public MainForm()
         {
@@ -334,6 +338,10 @@ namespace ExtremeInjector.UI
             _autoInjectTimer = new System.Windows.Forms.Timer { Interval = 400 };
             _autoInjectTimer.Tick += AutoInjectTimer_Tick;
 
+            _processWatcherTimer = new System.Windows.Forms.Timer { Interval = 300 };
+            _processWatcherTimer.Tick += (s, e) => UpdateProcessDetails();
+            _processWatcherTimer.Start();
+
             Controls.AddRange(new Control[] {
                 pnlContent,
                 titleBar
@@ -401,9 +409,14 @@ namespace ExtremeInjector.UI
             string name = txtProcess.Text.Trim();
             if (string.IsNullOrEmpty(name))
             {
+                currentSelectedPid = 0;
+                _lastObservedPid = 0;
+                _lastObservedProcessName = "";
                 picAppIcon.Visible = false;
+                picAppIcon.Image = null;
                 lblProcessTitle.Visible = false;
                 lblProcessPid.Visible = false;
+                UpdateInjectButtonState();
                 return;
             }
 
@@ -414,70 +427,82 @@ namespace ExtremeInjector.UI
                 {
                     var p = processes[0];
                     currentSelectedPid = p.Id;
-                    string title = "";
-                    try
+
+                    if (_lastObservedPid != p.Id || !string.Equals(_lastObservedProcessName, name, StringComparison.OrdinalIgnoreCase))
                     {
-                        string fullPath = GetProcessFullPath(p);
-                        if (!string.IsNullOrEmpty(fullPath) && File.Exists(fullPath))
+                        _lastObservedPid = p.Id;
+                        _lastObservedProcessName = name;
+
+                        string title = "";
+                        try
                         {
-                            var vi = FileVersionInfo.GetVersionInfo(fullPath);
-                            if (!string.IsNullOrWhiteSpace(vi.FileDescription))
+                            string fullPath = GetProcessFullPath(p);
+                            if (!string.IsNullOrEmpty(fullPath) && File.Exists(fullPath))
                             {
-                                title = vi.FileDescription;
+                                var vi = FileVersionInfo.GetVersionInfo(fullPath);
+                                if (!string.IsNullOrWhiteSpace(vi.FileDescription))
+                                {
+                                    title = vi.FileDescription;
+                                }
+                                else if (!string.IsNullOrWhiteSpace(vi.ProductName))
+                                {
+                                    title = vi.ProductName;
+                                }
                             }
-                            else if (!string.IsNullOrWhiteSpace(vi.ProductName))
+
+                            if (string.IsNullOrWhiteSpace(title) && !string.IsNullOrWhiteSpace(p.MainWindowTitle))
                             {
-                                title = vi.ProductName;
+                                title = p.MainWindowTitle;
                             }
                         }
+                        catch { }
 
-                        if (string.IsNullOrWhiteSpace(title) && !string.IsNullOrWhiteSpace(p.MainWindowTitle))
+                        if (string.IsNullOrWhiteSpace(title))
                         {
-                            title = p.MainWindowTitle;
+                            title = p.ProcessName;
+                        }
+
+                        lblProcessTitle.Text = title;
+                        lblProcessPid.Text = $"Process ID: 0x{p.Id:X} ({p.Id})";
+
+                        Image? icon = GetProcessIcon(p);
+                        if (icon != null)
+                        {
+                            picAppIcon.Image = icon;
+                        }
+                        else
+                        {
+                            picAppIcon.Image = null;
                         }
                     }
-                    catch { }
 
-                    if (string.IsNullOrWhiteSpace(title))
-                    {
-                        title = p.ProcessName;
-                    }
-
-                    lblProcessTitle.Text = title;
-                    lblProcessPid.Text = $"Process ID: 0x{p.Id:X} ({p.Id})";
                     lblProcessTitle.Visible = true;
                     lblProcessPid.Visible = true;
-
-                    Image? icon = GetProcessIcon(p);
-                    if (icon != null)
-                    {
-                        picAppIcon.Image = icon;
-                        picAppIcon.Visible = true;
-                    }
-                    else
-                    {
-                        picAppIcon.Visible = false;
-                    }
+                    picAppIcon.Visible = (picAppIcon.Image != null);
                 }
                 else
                 {
                     currentSelectedPid = 0;
-                    lblProcessTitle.Text = name;
-                    lblProcessPid.Text = "Process not running";
-                    lblProcessTitle.Visible = true;
-                    lblProcessPid.Visible = true;
+                    _lastObservedPid = 0;
+                    _lastObservedProcessName = "";
                     picAppIcon.Visible = false;
+                    picAppIcon.Image = null;
+                    lblProcessTitle.Visible = false;
+                    lblProcessPid.Visible = false;
                 }
             }
             catch
             {
                 currentSelectedPid = 0;
-                lblProcessTitle.Text = name;
-                lblProcessPid.Text = "Process ID: Unknown";
-                lblProcessTitle.Visible = true;
-                lblProcessPid.Visible = true;
+                _lastObservedPid = 0;
+                _lastObservedProcessName = "";
                 picAppIcon.Visible = false;
+                picAppIcon.Image = null;
+                lblProcessTitle.Visible = false;
+                lblProcessPid.Visible = false;
             }
+
+            UpdateInjectButtonState();
         }
 
         private Image? GetProcessIcon(Process p)
@@ -633,6 +658,7 @@ namespace ExtremeInjector.UI
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
             _autoInjectTimer?.Stop();
+            _processWatcherTimer?.Stop();
             base.OnFormClosing(e);
         }
 
@@ -644,12 +670,12 @@ namespace ExtremeInjector.UI
             string procName = txtProcess.Text.Trim();
             if (string.IsNullOrEmpty(procName)) return;
 
-            var enabledDlls = lstDlls.Items.Cast<ListViewItem>()
+            var enabledModules = lstDlls.Items.Cast<ListViewItem>()
                 .Where(i => i.Checked && i.Tag is ModuleItem)
-                .Select(i => ((ModuleItem)i.Tag!).Path)
+                .Select(i => (ModuleItem)i.Tag!)
                 .ToList();
 
-            if (enabledDlls.Count == 0) return;
+            if (enabledModules.Count == 0) return;
 
             try
             {
@@ -667,7 +693,7 @@ namespace ExtremeInjector.UI
                     int targetPid = targetProc.Id;
                     _autoInjectedPids.Add(targetPid);
 
-                    var result = await InjectionOrchestrator.ExecuteInjectionAsync(procName, enabledDlls, SettingsManager.Current.Options);
+                    var result = await InjectionOrchestrator.ExecuteInjectionAsync(procName, enabledModules, SettingsManager.Current.Options);
 
                     _isAutoInjecting = false;
 
@@ -691,7 +717,7 @@ namespace ExtremeInjector.UI
 
         private void UpdateInjectButtonState()
         {
-            bool hasProcess = !string.IsNullOrWhiteSpace(txtProcess.Text);
+            bool hasProcess = (currentSelectedPid > 0) && !string.IsNullOrWhiteSpace(txtProcess.Text);
             bool hasDll = lstDlls.Items.Cast<ListViewItem>().Any(i => i.Checked);
             btnInject.Enabled = hasProcess && hasDll;
         }
@@ -906,12 +932,12 @@ namespace ExtremeInjector.UI
                 return;
             }
 
-            var enabledDlls = lstDlls.Items.Cast<ListViewItem>()
+            var enabledModules = lstDlls.Items.Cast<ListViewItem>()
                 .Where(i => i.Checked && i.Tag is ModuleItem)
-                .Select(i => ((ModuleItem)i.Tag!).Path)
+                .Select(i => (ModuleItem)i.Tag!)
                 .ToList();
 
-            if (enabledDlls.Count == 0)
+            if (enabledModules.Count == 0)
             {
                 MessageBox.Show("Please add and check at least one DLL to inject.", "Extreme Injector", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
@@ -919,7 +945,7 @@ namespace ExtremeInjector.UI
 
             btnInject.Enabled = false;
 
-            var result = await ExtremeInjector.Core.InjectionOrchestrator.ExecuteInjectionAsync(txtProcess.Text, enabledDlls, SettingsManager.Current.Options);
+            var result = await ExtremeInjector.Core.InjectionOrchestrator.ExecuteInjectionAsync(txtProcess.Text, enabledModules, SettingsManager.Current.Options);
 
             btnInject.Enabled = true;
 
@@ -942,7 +968,15 @@ namespace ExtremeInjector.UI
         {
             if (e.Column == 0)
             {
-                isSortAscending = !isSortAscending;
+                if (!isSortActive)
+                {
+                    isSortActive = true;
+                    isSortAscending = true;
+                }
+                else
+                {
+                    isSortAscending = !isSortAscending;
+                }
                 SortDllList();
                 lstDlls.Invalidate();
             }
@@ -1055,35 +1089,38 @@ namespace ExtremeInjector.UI
             var textRect = new Rectangle(textLeft, e.Bounds.Top, textWidth, e.Bounds.Height);
             TextRenderer.DrawText(e.Graphics, e.Header?.Text ?? "DLL Name", lstDlls.Font, textRect, Color.Black, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
 
-            // 5. Sort Arrow INSIDE the right boundary (immediately to the left of rightDividerX)
-            int arrowX = rightDividerX - 13;
-            int arrowY = e.Bounds.Top + (e.Bounds.Height - 6) / 2;
-
-            Point[] triangle;
-            if (isSortAscending)
+            // 5. Sort Arrow INSIDE the right boundary (ONLY when sort is active!)
+            if (isSortActive)
             {
-                // Up arrow ▲ (Apex pointing UP)
-                triangle = new Point[]
-                {
-                    new Point(arrowX + 4, arrowY),
-                    new Point(arrowX + 8, arrowY + 5),
-                    new Point(arrowX, arrowY + 5)
-                };
-            }
-            else
-            {
-                // Down arrow ▼ (Apex pointing DOWN)
-                triangle = new Point[]
-                {
-                    new Point(arrowX, arrowY + 1),
-                    new Point(arrowX + 8, arrowY + 1),
-                    new Point(arrowX + 4, arrowY + 6)
-                };
-            }
+                int arrowX = rightDividerX - 13;
+                int arrowY = e.Bounds.Top + (e.Bounds.Height - 6) / 2;
 
-            Color arrowColor = isHot ? Color.FromArgb(40, 40, 40) : Color.FromArgb(130, 130, 130);
-            using var arrowBrush = new SolidBrush(arrowColor);
-            e.Graphics.FillPolygon(arrowBrush, triangle);
+                Point[] triangle;
+                if (isSortAscending)
+                {
+                    // Up arrow ▲ (Apex pointing UP)
+                    triangle = new Point[]
+                    {
+                        new Point(arrowX + 4, arrowY),
+                        new Point(arrowX + 8, arrowY + 5),
+                        new Point(arrowX, arrowY + 5)
+                    };
+                }
+                else
+                {
+                    // Down arrow ▼ (Apex pointing DOWN)
+                    triangle = new Point[]
+                    {
+                        new Point(arrowX, arrowY + 1),
+                        new Point(arrowX + 8, arrowY + 1),
+                        new Point(arrowX + 4, arrowY + 6)
+                    };
+                }
+
+                Color arrowColor = isHot ? Color.FromArgb(40, 40, 40) : Color.FromArgb(130, 130, 130);
+                using var arrowBrush = new SolidBrush(arrowColor);
+                e.Graphics.FillPolygon(arrowBrush, triangle);
+            }
         }
 
         private void LstDlls_DrawItem(object? sender, DrawListViewItemEventArgs e)

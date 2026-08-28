@@ -10,7 +10,7 @@ namespace ExtremeInjector.Core
 {
     public static class InjectionOrchestrator
     {
-        public static async Task<InjectionResult> ExecuteInjectionAsync(string processName, System.Collections.Generic.List<string> dllPaths, OptionsConfig options)
+        public static async Task<InjectionResult> ExecuteInjectionAsync(string processName, System.Collections.Generic.List<ModuleItem> modules, OptionsConfig options)
         {
             var result = new InjectionResult();
 
@@ -38,39 +38,71 @@ namespace ExtremeInjector.Core
             }
 
             int successCount = 0;
-            foreach (var dll in dllPaths)
+            foreach (var mod in modules)
             {
+                string dll = mod.Path;
                 bool injected = false;
                 string err = "";
 
-                switch (options.Method)
+                string targetDllToInject = dll;
+                string? tempScrambledPath = null;
+
+                if (IsScrambleEnabled(options.Scramble))
                 {
-                    case 0: // Standard Injection
-                    default:
-                        injected = StandardInjector.Inject(pid, dll, options, out err);
-                        break;
-                    case 2: // LdrLoadDll Stub
-                    case 3: // LdrpLoadDll Stub
-                        injected = LdrLoadDllInjector.Inject(pid, dll, options, out err);
-                        break;
-                    case 4: // Manual Map
-                        injected = ManualMapInjector.Inject(pid, dll, options, out err);
-                        break;
+                    string tempFile = Path.Combine(Path.GetTempPath(), $"EI_{Guid.NewGuid():N}.dll");
+                    if (ScramblerEngine.ScrambleFile(dll, tempFile, options.Scramble!, out _))
+                    {
+                        tempScrambledPath = tempFile;
+                        targetDllToInject = tempFile;
+                    }
+                }
+
+                try
+                {
+                    switch (options.Method)
+                    {
+                        case 0: // Standard Injection
+                            injected = StandardInjector.Inject(pid, targetDllToInject, options, out err);
+                            break;
+                        case 1: // Thread Hijacking
+                            injected = ThreadHijackInjector.Inject(pid, targetDllToInject, options, out err);
+                            break;
+                        case 2: // LdrLoadDll Stub
+                        case 3: // LdrpLoadDll Stub
+                            injected = LdrLoadDllInjector.Inject(pid, targetDllToInject, options, out err);
+                            break;
+                        case 4: // Manual Map
+                            injected = ManualMapInjector.Inject(pid, targetDllToInject, options, out err);
+                            break;
+                        default:
+                            injected = StandardInjector.Inject(pid, targetDllToInject, options, out err);
+                            break;
+                    }
+                }
+                finally
+                {
+                    if (tempScrambledPath != null && File.Exists(tempScrambledPath))
+                    {
+                        try { File.Delete(tempScrambledPath); } catch { }
+                    }
                 }
 
                 if (injected)
                 {
                     successCount++;
 
-                    // Apply Post-Injection Options
-                    if (options.ErasePE)
+                    // Apply Post-Injection Options (ManualMap handles ErasePE internally and is already unlinked from PEB)
+                    if (options.Method != 4)
                     {
-                        PostProcessor.ErasePEHeader(pid, dll, out _);
-                    }
+                        if (options.ErasePE)
+                        {
+                            PostProcessor.ErasePEHeader(pid, dll, out _);
+                        }
 
-                    if (options.HideModule)
-                    {
-                        PostProcessor.HideModule(pid, dll, out _);
+                        if (options.HideModule)
+                        {
+                            PostProcessor.HideModule(pid, dll, out _);
+                        }
                     }
                 }
                 else
@@ -84,11 +116,35 @@ namespace ExtremeInjector.Core
                 }
             }
 
-            result.Success = (successCount == dllPaths.Count);
+            result.Success = (successCount == modules.Count);
             result.InjectedCount = successCount;
-            result.TotalCount = dllPaths.Count;
+            result.TotalCount = modules.Count;
 
             return result;
+        }
+
+        public static Task<InjectionResult> ExecuteInjectionAsync(string processName, System.Collections.Generic.List<string> dllPaths, OptionsConfig options)
+        {
+            var modules = dllPaths.Select(p => new ModuleItem { Path = p, Enable = true }).ToList();
+            return ExecuteInjectionAsync(processName, modules, options);
+        }
+
+        private static bool IsScrambleEnabled(ScrambleConfig? sc)
+        {
+            if (sc == null) return false;
+            return sc.ScrambleHeaderFields ||
+                   sc.RemoveUselessData ||
+                   sc.InsertExtraSections ||
+                   sc.ShiftSectionData ||
+                   sc.ModifyAssemblyCode ||
+                   sc.RenameSections ||
+                   sc.ShiftSectionMemory ||
+                   sc.StripSectionCharacteristics ||
+                   sc.CreateNewEntryPoint ||
+                   sc.ModifyImportTable ||
+                   sc.RemoveDebugData ||
+                   sc.MoveRelocationTable ||
+                   sc.CreateFakeDebugDirectory;
         }
     }
 

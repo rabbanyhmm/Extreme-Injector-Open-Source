@@ -576,74 +576,66 @@ namespace ExtremeInjector.UI
             var exports = new List<(string Name, uint RVA)>();
             try
             {
-                using var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                using var reader = new BinaryReader(fs);
+                byte[] bytes = File.ReadAllBytes(filePath);
+                if (bytes.Length < 0x40) return exports;
 
-                if (reader.ReadUInt16() != 0x5A4D) return exports; // 'MZ'
-                fs.Seek(0x3C, SeekOrigin.Begin);
-                uint e_lfanew = reader.ReadUInt32();
+                ushort mz = BitConverter.ToUInt16(bytes, 0);
+                if (mz != 0x5A4D) return exports; // 'MZ'
 
-                fs.Seek(e_lfanew, SeekOrigin.Begin);
-                if (reader.ReadUInt32() != 0x00004550) return exports; // 'PE\0\0'
+                int peOffset = BitConverter.ToInt32(bytes, 0x3C);
+                if (peOffset + 0x18 > bytes.Length) return exports;
 
-                ushort machine = reader.ReadUInt16();
-                ushort numSections = reader.ReadUInt16();
-                fs.Seek(12, SeekOrigin.Current);
-                ushort sizeOfOptHeader = reader.ReadUInt16();
-                ushort characteristics = reader.ReadUInt16();
+                uint peSig = BitConverter.ToUInt32(bytes, peOffset);
+                if (peSig != 0x00004550) return exports; // 'PE\0\0'
 
-                long optHeaderStart = fs.Position;
-                ushort magic = reader.ReadUInt16();
+                ushort numSections = BitConverter.ToUInt16(bytes, peOffset + 6);
+                ushort sizeOfOptHeader = BitConverter.ToUInt16(bytes, peOffset + 20);
+
+                int optHeaderOffset = peOffset + 24;
+                if (optHeaderOffset + sizeOfOptHeader > bytes.Length) return exports;
+
+                ushort magic = BitConverter.ToUInt16(bytes, optHeaderOffset);
                 bool is64 = (magic == 0x020B);
 
-                uint exportRva = 0;
-                if (is64)
-                {
-                    fs.Seek(optHeaderStart + 112, SeekOrigin.Begin);
-                    exportRva = reader.ReadUInt32();
-                }
-                else
-                {
-                    fs.Seek(optHeaderStart + 96, SeekOrigin.Begin);
-                    exportRva = reader.ReadUInt32();
-                }
+                int exportDirDataOffset = is64 ? (optHeaderOffset + 112) : (optHeaderOffset + 96);
+                if (exportDirDataOffset + 8 > bytes.Length) return exports;
 
+                uint exportRva = BitConverter.ToUInt32(bytes, exportDirDataOffset);
                 if (exportRva == 0) return exports;
 
-                long sectionHeaderStart = optHeaderStart + sizeOfOptHeader;
-                var sections = new List<(uint VirtAddr, uint VirtSize, uint RawOffset)>();
+                int sectionHeaderOffset = optHeaderOffset + sizeOfOptHeader;
+                var sections = new (uint VirtAddr, uint VirtSize, uint RawOffset)[numSections];
                 for (int i = 0; i < numSections; i++)
                 {
-                    fs.Seek(sectionHeaderStart + (i * 40), SeekOrigin.Begin);
-                    fs.Seek(8, SeekOrigin.Current);
-                    uint virtSize = reader.ReadUInt32();
-                    uint virtAddr = reader.ReadUInt32();
-                    uint rawSize = reader.ReadUInt32();
-                    uint rawOffset = reader.ReadUInt32();
-                    sections.Add((virtAddr, virtSize, rawOffset));
+                    int sOff = sectionHeaderOffset + (i * 40);
+                    if (sOff + 40 > bytes.Length) break;
+                    uint virtSize = BitConverter.ToUInt32(bytes, sOff + 8);
+                    uint virtAddr = BitConverter.ToUInt32(bytes, sOff + 12);
+                    uint rawSize = BitConverter.ToUInt32(bytes, sOff + 16);
+                    uint rawOffset = BitConverter.ToUInt32(bytes, sOff + 20);
+                    sections[i] = (virtAddr, Math.Max(virtSize, rawSize), rawOffset);
                 }
 
                 long RvaToOffset(uint rva)
                 {
-                    foreach (var sec in sections)
+                    for (int i = 0; i < sections.Length; i++)
                     {
-                        if (rva >= sec.VirtAddr && rva < sec.VirtAddr + sec.VirtSize)
+                        if (rva >= sections[i].VirtAddr && rva < sections[i].VirtAddr + sections[i].VirtSize)
                         {
-                            return sec.RawOffset + (rva - sec.VirtAddr);
+                            return sections[i].RawOffset + (rva - sections[i].VirtAddr);
                         }
                     }
                     return -1;
                 }
 
                 long exportOffset = RvaToOffset(exportRva);
-                if (exportOffset == -1) return exports;
+                if (exportOffset == -1 || exportOffset + 40 > bytes.Length) return exports;
 
-                fs.Seek(exportOffset + 24, SeekOrigin.Begin);
-                uint numFunctions = reader.ReadUInt32();
-                uint numNames = reader.ReadUInt32();
-                uint addrOfFunctions = reader.ReadUInt32();
-                uint addrOfNames = reader.ReadUInt32();
-                uint addrOfNameOrdinals = reader.ReadUInt32();
+                uint numFunctions = BitConverter.ToUInt32(bytes, (int)exportOffset + 20);
+                uint numNames = BitConverter.ToUInt32(bytes, (int)exportOffset + 24);
+                uint addrOfFunctions = BitConverter.ToUInt32(bytes, (int)exportOffset + 28);
+                uint addrOfNames = BitConverter.ToUInt32(bytes, (int)exportOffset + 32);
+                uint addrOfNameOrdinals = BitConverter.ToUInt32(bytes, (int)exportOffset + 36);
 
                 long nameArrayOffset = RvaToOffset(addrOfNames);
                 long ordinalArrayOffset = RvaToOffset(addrOfNameOrdinals);
@@ -653,26 +645,28 @@ namespace ExtremeInjector.UI
                 {
                     for (uint i = 0; i < numNames; i++)
                     {
-                        fs.Seek(nameArrayOffset + (i * 4), SeekOrigin.Begin);
-                        uint nameRva = reader.ReadUInt32();
+                        int nOff = (int)nameArrayOffset + (int)(i * 4);
+                        int oOff = (int)ordinalArrayOffset + (int)(i * 2);
+                        if (nOff + 4 > bytes.Length || oOff + 2 > bytes.Length) break;
+
+                        uint nameRva = BitConverter.ToUInt32(bytes, nOff);
+                        ushort ordinal = BitConverter.ToUInt16(bytes, oOff);
+
+                        int fOff = (int)funcArrayOffset + (ordinal * 4);
+                        if (fOff + 4 > bytes.Length) continue;
+                        uint funcRva = BitConverter.ToUInt32(bytes, fOff);
+
                         long nameOffset = RvaToOffset(nameRva);
-                        if (nameOffset == -1) continue;
+                        if (nameOffset == -1 || nameOffset >= bytes.Length) continue;
 
-                        fs.Seek(ordinalArrayOffset + (i * 2), SeekOrigin.Begin);
-                        ushort ordinal = reader.ReadUInt16();
+                        int nameEnd = (int)nameOffset;
+                        while (nameEnd < bytes.Length && bytes[nameEnd] != 0) nameEnd++;
 
-                        fs.Seek(funcArrayOffset + (ordinal * 4), SeekOrigin.Begin);
-                        uint funcRva = reader.ReadUInt32();
-
-                        fs.Seek(nameOffset, SeekOrigin.Begin);
-                        var sb = new StringBuilder();
-                        byte b;
-                        while ((b = reader.ReadByte()) != 0)
+                        string nameStr = Encoding.ASCII.GetString(bytes, (int)nameOffset, nameEnd - (int)nameOffset);
+                        if (!string.IsNullOrEmpty(nameStr))
                         {
-                            sb.Append((char)b);
+                            exports.Add((nameStr, funcRva));
                         }
-
-                        exports.Add((sb.ToString(), funcRva));
                     }
                 }
 
