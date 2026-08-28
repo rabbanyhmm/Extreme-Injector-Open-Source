@@ -64,9 +64,9 @@ namespace ExtremeInjector.Core
 
         /// <summary>
         /// Attempts to open a target process with desired access.
-        /// Normal (unprotected) processes: returns the direct OpenProcess handle immediately, no extra overhead.
-        /// Protected processes where OpenProcess fails: falls back to handle hijacking via NtQuerySystemInformation.
-        /// HijackHandle already validates each duplicated handle internally with a VirtualAllocEx probe.
+        /// Normal processes: OpenProcess succeeds and the probe confirms VM write access — handle returned immediately.
+        /// Protected processes (e.g. HD-Player): OpenProcess may succeed but with a restricted handle that blocks
+        /// VirtualAllocEx (Error 5). The probe detects this and silently falls through to HijackHandle.
         /// </summary>
         public static IntPtr OpenProcessSmart(int processId, uint desiredAccess, out bool wasHijacked)
         {
@@ -75,15 +75,28 @@ namespace ExtremeInjector.Core
             // Enable SeDebugPrivilege upfront — helps with both paths
             PrivilegeManager.EnableAllSecurityPrivileges();
 
-            // Try direct OpenProcess — for normal processes this just works, no extra overhead
+            // Try direct OpenProcess first
             IntPtr hProcess = NativeMethods.OpenProcess(desiredAccess, false, processId);
             if (hProcess != IntPtr.Zero)
             {
-                return hProcess;
+                // Probe VM write access — some anti-cheat hooks let OpenProcess succeed but
+                // hand back a handle with restricted rights that blocks VirtualAllocEx (Error 5).
+                // If the probe passes, the handle is fully usable and we return it immediately.
+                // Normal (unprotected) processes always pass here — no overhead beyond this one alloc+free.
+                IntPtr probe = NativeMethods.VirtualAllocEx(hProcess, IntPtr.Zero, (UIntPtr)0x1000,
+                    NativeMethods.MEM_COMMIT | NativeMethods.MEM_RESERVE, NativeMethods.PAGE_READWRITE);
+                if (probe != IntPtr.Zero)
+                {
+                    NativeMethods.VirtualFreeEx(hProcess, probe, UIntPtr.Zero, NativeMethods.MEM_RELEASE);
+                    return hProcess;
+                }
+
+                // Handle present but VM access denied — close it and fall through to hijack
+                NativeMethods.CloseHandle(hProcess);
             }
 
-            // OpenProcess failed (protected/hooked process) — scan the system handle table and
-            // duplicate a privileged handle from another process that already has one open.
+            // OpenProcess failed outright OR returned a restricted handle — scan the system handle
+            // table and duplicate a privileged handle from a process that already has one open.
             // HijackHandle probes each candidate with VirtualAllocEx before returning it.
             hProcess = HijackHandle((uint)processId, desiredAccess);
             if (hProcess != IntPtr.Zero)
