@@ -106,7 +106,7 @@ Extreme-Injector-Open-Source/
 
 ### Prerequisites
 * Windows 10 or Windows 11 (x86 / x64)
-* [.NET SDK 8.0+](https://dotnet.microsoft.com/download) or Visual Studio 2022 (targeting `net48`)
+* [.NET Framework 4.8 Developer Pack](https://dotnet.microsoft.com/download/dotnet-framework/net48) or Visual Studio 2019 / 2022
 
 ### Build
 
