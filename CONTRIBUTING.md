@@ -9,8 +9,7 @@ Thank you for your interest in contributing to **Extreme Injector (Open Source R
 ### Prerequisites
 - **Operating System:** Windows 10 or Windows 11 (x86 / x64)
 - **Development Tools:** 
-  - [.NET SDK 8.0+](https://dotnet.microsoft.com/download) (or Visual Studio 2022 with *.NET Desktop Development* workload)
-  - [.NET Framework 4.8 Developer Pack](https://dotnet.microsoft.com/download/dotnet-framework/net48)
+  - [.NET Framework 4.8 Developer Pack](https://dotnet.microsoft.com/download/dotnet-framework/net48) or Visual Studio 2019 / 2022 with *.NET Desktop Development* workload
 
 ### Getting the Code
 
