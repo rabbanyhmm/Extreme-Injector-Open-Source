@@ -1,0 +1,32 @@
+name: .NET Build & CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup .NET SDK
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Restore dependencies
+      run: dotnet restore ./src/ExtremeInjectorReplica/ExtremeInjectorReplica.csproj
+
+    - name: Build Release binary
+      run: dotnet build ./src/ExtremeInjectorReplica/ExtremeInjectorReplica.csproj -c Release --no-restore
+
+    - name: Upload Build Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: Extreme-Injector-v3-Executable
+        path: src/ExtremeInjectorReplica/bin/Release/net48/
