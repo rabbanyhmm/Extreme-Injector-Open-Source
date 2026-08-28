@@ -137,6 +137,10 @@ The output executable will be created at `src/ExtremeInjectorReplica/bin/Release
   <a href="https://github.com/ShlokBorad">
     <img src="https://wsrv.nl/?url=github.com/ShlokBorad.png&w=100&h=100&mask=circle&output=png" width="55" height="55" alt="ShlokBorad" title="ShlokBorad (Thread-Map Technique)">
   </a>
+  &nbsp;&nbsp;
+  <a href="https://github.com/arghadeeplaskar">
+    <img src="https://wsrv.nl/?url=github.com/arghadeeplaskar.png&w=100&h=100&mask=circle&output=png" width="55" height="55" alt="arghadeeplaskar" title="arghadeeplaskar">
+  </a>
 </p>
 
 ---
