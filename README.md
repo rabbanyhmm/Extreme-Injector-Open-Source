@@ -122,19 +122,20 @@ The output executable will be created at `src/ExtremeInjectorReplica/bin/Release
 <h2 align="center">Contributors</h2>
 
 <p align="center">
-  <a href="https://github.com/rabbanyhmm">
-    <img src="https://wsrv.nl/?url=github.com/rabbanyhmm.png&mask=circle&bg=transparent" width="50" height="50" alt="rabbanyhmm" title="rabbanyhmm (Maintainer)">
-  </a>
-  <a href="https://github.com/ShlokBorad">
-    <img src="https://wsrv.nl/?url=github.com/ShlokBorad.png&mask=circle&bg=transparent" width="50" height="50" alt="ShlokBorad" title="ShlokBorad (Thread-Map Technique)">
+  <a href="https://github.com/rabbanyhmm/Extreme-Injector-Open-Source/graphs/contributors">
+    <img src="https://contrib.rocks/image?repo=rabbanyhmm/Extreme-Injector-Open-Source" alt="Repository Contributors" />
   </a>
 </p>
 
-<h3 align="center">Original UI & Concept Design</h3>
+<h3 align="center">Credits & Acknowledgements</h3>
 
 <p align="center">
   <a href="https://github.com/master131">
-    <img src="https://wsrv.nl/?url=github.com/master131.png&mask=circle&bg=transparent" width="58" height="58" alt="master131" title="master131 (Original UI & Concept Design)">
+    <img src="https://wsrv.nl/?url=github.com/master131.png&w=100&h=100&mask=circle&output=png" width="55" height="55" alt="master131" title="master131 (Original UI & Concept Design)">
+  </a>
+  &nbsp;&nbsp;
+  <a href="https://github.com/ShlokBorad">
+    <img src="https://wsrv.nl/?url=github.com/ShlokBorad.png&w=100&h=100&mask=circle&output=png" width="55" height="55" alt="ShlokBorad" title="ShlokBorad (Thread-Map Technique)">
   </a>
 </p>
 
