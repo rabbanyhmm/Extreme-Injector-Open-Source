@@ -123,35 +123,24 @@ The output executable will be created at `src/ExtremeInjectorReplica/bin/Release
 
 ---
 
-## Contributors
+<h2 align="center">Contributors</h2>
 
-Special thanks to everyone who has contributed features, fixes, or improvements to this repository:
-
-<p align="left">
+<p align="center">
   <a href="https://github.com/rabbanyhmm">
-    <img src="https://github.com/rabbanyhmm.png?size=100" width="70" height="70" alt="rabbanyhmm" style="border-radius:50%;">
-    <br />
-    <b>rabbanyhmm</b> (Maintainer)
+    <img src="https://github.com/rabbanyhmm.png?size=100" width="52" height="52" alt="rabbanyhmm" title="rabbanyhmm (Maintainer)" style="border-radius:50%; margin: 4px;">
   </a>
-  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
   <a href="https://github.com/ShlokBorad">
-    <img src="https://github.com/ShlokBorad.png?size=100" width="70" height="70" alt="ShlokBorad" style="border-radius:50%;">
-    <br />
-    <b>ShlokBorad</b> (Thread-Map Technique)
+    <img src="https://github.com/ShlokBorad.png?size=100" width="52" height="52" alt="ShlokBorad" title="ShlokBorad (Thread-Map Technique)" style="border-radius:50%; margin: 4px;">
   </a>
 </p>
 
----
+<h3 align="center">Original Creator</h3>
 
-## Credits & Acknowledgements
-
-Extreme Injector v3 was originally created and designed by **[master131](https://github.com/master131)**.
-
-<a href="https://github.com/master131">
-  <img src="https://github.com/master131.png?size=100" width="80" height="80" alt="master131" style="border-radius:50%;">
-  <br />
-  <b>master131</b> (Original Creator)
-</a>
+<p align="center">
+  <a href="https://github.com/master131">
+    <img src="https://github.com/master131.png?size=100" width="64" height="64" alt="master131" title="master131 (Original Creator of Extreme Injector)" style="border-radius:50%; margin: 4px;">
+  </a>
+</p>
 
 ---
 
