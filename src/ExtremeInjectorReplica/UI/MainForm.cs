@@ -361,10 +361,93 @@ namespace ExtremeInjector.UI
             }
         }
 
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool ChangeWindowMessageFilterEx(IntPtr hWnd, uint msg, uint action, IntPtr pChangeFilterStruct);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool ChangeWindowMessageFilter(uint msg, uint flag);
+
+        [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+        private static extern uint DragQueryFile(IntPtr hDrop, uint iFile, StringBuilder lpszFile, uint cch);
+
+        [DllImport("shell32.dll")]
+        private static extern void DragFinish(IntPtr hDrop);
+
+        [DllImport("shell32.dll")]
+        private static extern void DragAcceptFiles(IntPtr hWnd, bool fAccept);
+
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            EnableAdminDragAndDrop(Handle);
+        }
+
+        private void EnableAdminDragAndDrop(IntPtr hWnd)
+        {
+            try
+            {
+                const uint MSGFLT_ALLOW = 1;
+                const uint WM_DROPFILES = 0x0233;
+                const uint WM_COPYDATA = 0x004A;
+                const uint WM_COPYGLOBALDATA = 0x0049;
+
+                ChangeWindowMessageFilter(WM_DROPFILES, MSGFLT_ALLOW);
+                ChangeWindowMessageFilter(WM_COPYDATA, MSGFLT_ALLOW);
+                ChangeWindowMessageFilter(WM_COPYGLOBALDATA, MSGFLT_ALLOW);
+
+                if (hWnd != IntPtr.Zero)
+                {
+                    ChangeWindowMessageFilterEx(hWnd, WM_DROPFILES, MSGFLT_ALLOW, IntPtr.Zero);
+                    ChangeWindowMessageFilterEx(hWnd, WM_COPYDATA, MSGFLT_ALLOW, IntPtr.Zero);
+                    ChangeWindowMessageFilterEx(hWnd, WM_COPYGLOBALDATA, MSGFLT_ALLOW, IntPtr.Zero);
+                    DragAcceptFiles(hWnd, true);
+                }
+            }
+            catch { }
+        }
+
         protected override void OnLoad(EventArgs e)
         {
             base.OnLoad(e);
+            AllowDrop = true;
+            if (lstDlls != null && lstDlls.IsHandleCreated)
+            {
+                lstDlls.AllowDrop = true;
+                EnableAdminDragAndDrop(lstDlls.Handle);
+            }
             ForceHeaderHeight(15);
+        }
+
+        protected override void WndProc(ref Message m)
+        {
+            const int WM_DROPFILES = 0x0233;
+            if (m.Msg == WM_DROPFILES)
+            {
+                IntPtr hDrop = m.WParam;
+                try
+                {
+                    uint count = DragQueryFile(hDrop, 0xFFFFFFFF, null!, 0);
+                    for (uint i = 0; i < count; i++)
+                    {
+                        var sb = new StringBuilder(260);
+                        if (DragQueryFile(hDrop, i, sb, (uint)sb.Capacity) > 0)
+                        {
+                            string file = sb.ToString();
+                            if (file.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+                            {
+                                AddDllToListView(file, true);
+                            }
+                        }
+                    }
+                    SaveModulesList();
+                }
+                finally
+                {
+                    DragFinish(hDrop);
+                }
+                return;
+            }
+            base.WndProc(ref m);
         }
 
         private void ForceHeaderHeight(int targetHeight)

@@ -5,100 +5,88 @@ using System.Runtime.InteropServices;
 namespace ExtremeInjector.Core
 {
     /// <summary>
-    /// Handle Hijacking Engine for Protected Processes (e.g. HD-Player / Emulators / Anti-Cheat Protected Targets).
-    /// When direct OpenProcess is blocked or hooked by anti-cheat drivers, this engine scans the system handle table
-    /// via NtQuerySystemInformation (SystemExtendedHandleInformation = 64) and duplicates an existing privileged handle
-    /// from another process (such as system services or background processes).
+    /// Scans system handle table and duplicates privileged process handles
+    /// when direct OpenProcess calls are restricted or hooked.
     /// </summary>
     public static class HandleHijacker
     {
         private const uint SystemExtendedHandleInformation = 64;
-        private const uint STATUS_INFO_LENGTH_MISMATCH = 0xC0000004;
+        private const uint STATUS_INFO_LENGTH_MISMATCH     = 0xC0000004;
 
-        private const uint PROCESS_DUP_HANDLE = 0x0040;
+        private const uint PROCESS_DUP_HANDLE    = 0x0040;
         private const uint DUPLICATE_SAME_ACCESS = 0x00000002;
 
         [StructLayout(LayoutKind.Sequential)]
         private struct SYSTEM_HANDLE_TABLE_ENTRY_INFO_EX
         {
-            public IntPtr Object;
+            public IntPtr  Object;
             public UIntPtr UniqueProcessId;
             public UIntPtr HandleValue;
-            public uint GrantedAccess;
-            public ushort CreatorBackTraceIndex;
-            public ushort ObjectTypeIndex;
-            public uint HandleAttributes;
-            public uint Reserved;
+            public uint    GrantedAccess;
+            public ushort  CreatorBackTraceIndex;
+            public ushort  ObjectTypeIndex;
+            public uint    HandleAttributes;
+            public uint    Reserved;
         }
 
-        [DllImport("ntdll.dll", SetLastError = true)]
+        [DllImport("ntdll.dll")]
         private static extern int NtQuerySystemInformation(
-            uint SystemInformationClass,
+            uint   SystemInformationClass,
             IntPtr SystemInformation,
-            uint SystemInformationLength,
-            out uint ReturnLength
-        );
+            uint   SystemInformationLength,
+            out uint ReturnLength);
 
         [DllImport("kernel32.dll", SetLastError = true)]
         private static extern IntPtr OpenProcess(uint dwDesiredAccess, bool bInheritHandle, uint dwProcessId);
 
         [DllImport("kernel32.dll", SetLastError = true)]
         private static extern bool DuplicateHandle(
-            IntPtr hSourceProcessHandle,
-            IntPtr hSourceHandle,
-            IntPtr hTargetProcessHandle,
+            IntPtr   hSourceProcessHandle,
+            IntPtr   hSourceHandle,
+            IntPtr   hTargetProcessHandle,
             out IntPtr lpTargetHandle,
-            uint dwDesiredAccess,
-            bool bInheritHandle,
-            uint dwOptions
-        );
+            uint     dwDesiredAccess,
+            bool     bInheritHandle,
+            uint     dwOptions);
 
         [DllImport("kernel32.dll", SetLastError = true)]
-        private static extern uint GetProcessId(IntPtr hInstance);
+        private static extern uint GetProcessId(IntPtr hProcess);
 
-        [DllImport("kernel32.dll", SetLastError = true)]
+        [DllImport("kernel32.dll")]
         private static extern IntPtr GetCurrentProcess();
 
         [DllImport("kernel32.dll", SetLastError = true)]
         private static extern bool CloseHandle(IntPtr hObject);
 
         /// <summary>
-        /// Attempts to open a target process with desired access.
-        /// Normal processes: OpenProcess succeeds and the probe confirms VM write access — handle returned immediately.
-        /// Protected processes (e.g. HD-Player): OpenProcess may succeed but with a restricted handle that blocks
-        /// VirtualAllocEx (Error 5). The probe detects this and silently falls through to HijackHandle.
+        /// Tries direct OpenProcess first, falling back to handle hijacking if memory allocation fails.
         /// </summary>
         public static IntPtr OpenProcessSmart(int processId, uint desiredAccess, out bool wasHijacked)
         {
             wasHijacked = false;
-
-            // Enable SeDebugPrivilege upfront — helps with both paths
             PrivilegeManager.EnableAllSecurityPrivileges();
 
-            // Try direct OpenProcess first
+            // Try standard OpenProcess
             IntPtr hProcess = NativeMethods.OpenProcess(desiredAccess, false, processId);
             if (hProcess != IntPtr.Zero)
             {
-                // Probe VM write access — some anti-cheat hooks let OpenProcess succeed but
-                // hand back a handle with restricted rights that blocks VirtualAllocEx (Error 5).
-                // If the probe passes, the handle is fully usable and we return it immediately.
-                // Normal (unprotected) processes always pass here — no overhead beyond this one alloc+free.
-                IntPtr probe = NativeMethods.VirtualAllocEx(hProcess, IntPtr.Zero, (UIntPtr)0x1000,
-                    NativeMethods.MEM_COMMIT | NativeMethods.MEM_RESERVE, NativeMethods.PAGE_READWRITE);
+                // Verify the handle allows memory operations
+                IntPtr probe = NativeMethods.VirtualAllocEx(
+                    hProcess, IntPtr.Zero, (UIntPtr)0x1000,
+                    NativeMethods.MEM_COMMIT | NativeMethods.MEM_RESERVE,
+                    NativeMethods.PAGE_READWRITE);
+
                 if (probe != IntPtr.Zero)
                 {
                     NativeMethods.VirtualFreeEx(hProcess, probe, UIntPtr.Zero, NativeMethods.MEM_RELEASE);
                     return hProcess;
                 }
 
-                // Handle present but VM access denied — close it and fall through to hijack
                 NativeMethods.CloseHandle(hProcess);
             }
 
-            // OpenProcess failed outright OR returned a restricted handle — scan the system handle
-            // table and duplicate a privileged handle from a process that already has one open.
-            // HijackHandle probes each candidate with VirtualAllocEx before returning it.
-            hProcess = HijackHandle((uint)processId, desiredAccess);
+            // Fallback: search system handle table
+            hProcess = FindAndHijackHandle((uint)processId);
             if (hProcess != IntPtr.Zero)
             {
                 wasHijacked = true;
@@ -109,17 +97,21 @@ namespace ExtremeInjector.Core
         }
 
         /// <summary>
-        /// Scans the system handle table for any existing handle pointing to targetPid with VM_OPERATION permissions,
-        /// duplicates it into our process, and returns the hijacked handle.
+        /// Searches the handle table for a handle pointing to targetPid with VM access rights.
         /// </summary>
-        public static IntPtr HijackHandle(uint targetPid, uint requiredAccess)
+        public static IntPtr FindAndHijackHandle(uint targetPid)
         {
-            uint bufferSize = 0x10000;
-            IntPtr buffer = Marshal.AllocHGlobal((int)bufferSize);
+            PrivilegeManager.EnableAllSecurityPrivileges();
+
+            uint   bufferSize = 0x10000;
+            IntPtr buffer     = Marshal.AllocHGlobal((int)bufferSize);
+
             try
             {
                 int status;
-                while ((status = (int)NtQuerySystemInformation(SystemExtendedHandleInformation, buffer, bufferSize, out uint returnLen)) == unchecked((int)STATUS_INFO_LENGTH_MISMATCH))
+                while ((status = NtQuerySystemInformation(
+                            SystemExtendedHandleInformation,
+                            buffer, bufferSize, out _)) == unchecked((int)STATUS_INFO_LENGTH_MISMATCH))
                 {
                     Marshal.FreeHGlobal(buffer);
                     bufferSize *= 2;
@@ -127,47 +119,58 @@ namespace ExtremeInjector.Core
                 }
 
                 if (status != 0)
-                {
                     return IntPtr.Zero;
-                }
 
-                ulong numberOfHandles = (ulong)Marshal.ReadIntPtr(buffer);
-                int currentPid = Process.GetCurrentProcess().Id;
+                ulong  numberOfHandles = (ulong)(UIntPtr)(ulong)Marshal.ReadIntPtr(buffer);
+                uint   currentPid      = (uint)Process.GetCurrentProcess().Id;
                 IntPtr hCurrentProcess = GetCurrentProcess();
-
-                int entrySize = Marshal.SizeOf(typeof(SYSTEM_HANDLE_TABLE_ENTRY_INFO_EX));
-                IntPtr pEntryBase = new IntPtr(buffer.ToInt64() + (IntPtr.Size * 2)); // Offset past NumberOfHandles & Reserved
+                int    entrySize       = Marshal.SizeOf<SYSTEM_HANDLE_TABLE_ENTRY_INFO_EX>();
+                IntPtr pEntries        = IntPtr.Add(buffer, IntPtr.Size * 2);
 
                 for (ulong i = 0; i < numberOfHandles; i++)
                 {
-                    IntPtr pCurrentEntry = new IntPtr(pEntryBase.ToInt64() + (long)(i * (ulong)entrySize));
-                    var entry = Marshal.PtrToStructure<SYSTEM_HANDLE_TABLE_ENTRY_INFO_EX>(pCurrentEntry);
+                    var entry = Marshal.PtrToStructure<SYSTEM_HANDLE_TABLE_ENTRY_INFO_EX>(
+                        IntPtr.Add(pEntries, (int)(i * (ulong)entrySize)));
 
                     uint ownerPid = (uint)entry.UniqueProcessId.ToUInt64();
                     if (ownerPid == currentPid) continue;
 
-                    // Filter: Handle must have VM_OPERATION (0x0008) permission at minimum
+                    // Must have VM_OPERATION permission
                     if ((entry.GrantedAccess & NativeMethods.PROCESS_VM_OPERATION) == 0) continue;
 
-                    IntPtr hOwner = OpenProcess(PROCESS_DUP_HANDLE, false, ownerPid);
+                    IntPtr hOwner = OpenProcess(0x1000 /* PROCESS_QUERY_LIMITED_INFORMATION */ | PROCESS_DUP_HANDLE, false, ownerPid);
+                    if (hOwner == IntPtr.Zero)
+                        hOwner = OpenProcess(PROCESS_DUP_HANDLE, false, ownerPid);
+
                     if (hOwner == IntPtr.Zero) continue;
 
                     try
                     {
-                        if (DuplicateHandle(hOwner, (IntPtr)entry.HandleValue.ToUInt64(), hCurrentProcess, out IntPtr hDup, 0, false, DUPLICATE_SAME_ACCESS))
+                        if (!DuplicateHandle(
+                                hOwner,
+                                (IntPtr)entry.HandleValue.ToUInt64(),
+                                hCurrentProcess,
+                                out IntPtr hDup,
+                                0, false,
+                                DUPLICATE_SAME_ACCESS))
+                            continue;
+
+                        if (GetProcessId(hDup) == targetPid)
                         {
-                            if (GetProcessId(hDup) == targetPid)
+                            // Verify memory allocation works
+                            IntPtr pTest = NativeMethods.VirtualAllocEx(
+                                hDup, IntPtr.Zero, (UIntPtr)0x1000,
+                                NativeMethods.MEM_COMMIT | NativeMethods.MEM_RESERVE,
+                                NativeMethods.PAGE_READWRITE);
+
+                            if (pTest != IntPtr.Zero)
                             {
-                                // Test allocation on duplicated handle to verify write access
-                                IntPtr pTest = NativeMethods.VirtualAllocEx(hDup, IntPtr.Zero, (UIntPtr)0x1000, NativeMethods.MEM_COMMIT | NativeMethods.MEM_RESERVE, NativeMethods.PAGE_READWRITE);
-                                if (pTest != IntPtr.Zero)
-                                {
-                                    NativeMethods.VirtualFreeEx(hDup, pTest, UIntPtr.Zero, NativeMethods.MEM_RELEASE);
-                                    return hDup; // Successfully hijacked privileged handle!
-                                }
+                                NativeMethods.VirtualFreeEx(hDup, pTest, UIntPtr.Zero, NativeMethods.MEM_RELEASE);
+                                return hDup;
                             }
-                            CloseHandle(hDup);
                         }
+
+                        CloseHandle(hDup);
                     }
                     finally
                     {
@@ -177,7 +180,6 @@ namespace ExtremeInjector.Core
             }
             catch
             {
-                // Fallback failed cleanly
             }
             finally
             {
@@ -186,5 +188,8 @@ namespace ExtremeInjector.Core
 
             return IntPtr.Zero;
         }
+
+        public static IntPtr HijackHandle(uint targetPid, uint requiredAccess)
+            => FindAndHijackHandle(targetPid);
     }
 }
