@@ -1,4 +1,4 @@
-# Extreme Injector v3 (Open Source)
+# Extreme Injector v3 (Open Source) 
 
 <p align="center">
   <a href="https://dotnet.microsoft.com/"><img src="https://img.shields.io/badge/.NET%20Framework-4.8-512BD4?logo=dotnet" alt=".NET Framework 4.8"></a>
